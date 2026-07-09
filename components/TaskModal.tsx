@@ -205,15 +205,15 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, logIndex, prefilledDate, on
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Judul Pekerjaan</label>
-                <input required disabled={isExisting} value={basicInfoState.title} onChange={e => setBasicInfoState({...basicInfoState, title: e.target.value})} className="w-full p-4 rounded-2xl border border-slate-200 font-bold focus:border-blue-500 outline-none transition-all text-sm bg-slate-50/50 focus:bg-white" />
+                <input required disabled={isExisting} value={basicInfoState.title} onChange={e => setBasicInfoState({...basicInfoState, title: e.target.value})} className="w-full p-4 rounded-2xl border border-slate-200 font-bold focus:border-blue-500 outline-none transition-all text-sm bg-slate-50/50 focus:bg-white text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Perusahaan / Klien</label>
-                <input required disabled={isExisting} value={basicInfoState.companyName} onChange={e => setBasicInfoState({...basicInfoState, companyName: e.target.value})} className="w-full p-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-slate-50/50 focus:bg-white" />
+                <input required disabled={isExisting} value={basicInfoState.companyName} onChange={e => setBasicInfoState({...basicInfoState, companyName: e.target.value})} className="w-full p-4 rounded-2xl border border-slate-200 focus:border-blue-500 outline-none text-sm bg-slate-50/50 focus:bg-white text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" />
               </div>
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Prioritas</label>
-                <select value={basicInfoState.priority} onChange={e => setBasicInfoState({...basicInfoState, priority: e.target.value as TaskPriority})} className="w-full p-4 rounded-2xl border border-slate-200 font-bold text-sm outline-none bg-slate-50/50 focus:bg-white">
+                <select value={basicInfoState.priority} onChange={e => setBasicInfoState({...basicInfoState, priority: e.target.value as TaskPriority})} className="w-full p-4 rounded-2xl border border-slate-200 font-bold text-sm outline-none bg-slate-50/50 focus:bg-white text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800">
                   <option value="Low">Low</option>
                   <option value="Medium">Medium</option>
                   <option value="High">High</option>
@@ -230,7 +230,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, logIndex, prefilledDate, on
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Status Pengerjaan</label>
-                  <select value={currentLog.status} onChange={e => setCurrentLog({...currentLog, status: e.target.value as TaskStatus})} className="w-full p-4 rounded-2xl border border-slate-200 bg-white font-bold text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all">
+                  <select value={currentLog.status} onChange={e => setCurrentLog({...currentLog, status: e.target.value as TaskStatus})} className="w-full p-4 rounded-2xl border border-slate-200 bg-white font-bold text-sm shadow-sm outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800">
                     <option value="Belum Mulai">Belum Mulai</option>
                     <option value="Proses">Proses</option>
                     <option value="Selesai">Selesai</option>
@@ -245,7 +245,7 @@ const TaskModal: React.FC<TaskModalProps> = ({ task, logIndex, prefilledDate, on
                 </div>
                 <div className="md:col-span-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Deskripsi Perubahan / Catatan</label>
-                  <textarea rows={4} value={currentLog.description} onChange={e => setCurrentLog({...currentLog, description: e.target.value})} className="w-full p-5 rounded-2xl border border-slate-200 bg-white shadow-sm outline-none text-sm resize-none focus:ring-2 focus:ring-blue-100 transition-all" placeholder="Jelaskan apa yang berubah atau apa yang dilakukan pada tahap ini..." />
+                  <textarea rows={4} value={currentLog.description} onChange={e => setCurrentLog({...currentLog, description: e.target.value})} className="w-full p-5 rounded-2xl border border-slate-200 bg-white shadow-sm outline-none text-sm resize-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" placeholder="Jelaskan apa yang berubah atau apa yang dilakukan pada tahap ini..." />
                 </div>
               </div>
             </div>

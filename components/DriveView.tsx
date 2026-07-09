@@ -460,7 +460,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                   placeholder="Masukkan judul postingan, e.g. Laporan Keuangan Bulan Juni"
                   value={title}
                   onChange={e => setTitle(e.target.value)}
-                  className="w-full p-4 bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-950 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all"
+                  className="w-full p-4 bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-950 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all text-slate-800 dark:text-white"
                 />
               </div>
 
@@ -470,7 +470,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                   placeholder="Tuliskan keterangan detail mengenai berkas atau postingan ini..."
                   value={content}
                   onChange={e => setContent(e.target.value)}
-                  className="w-full p-4 bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-950 rounded-2xl outline-none font-medium text-sm h-32 focus:border-indigo-500 transition-all resize-none"
+                  className="w-full p-4 bg-white border border-slate-200 dark:border-slate-800 dark:bg-slate-950 rounded-2xl outline-none font-medium text-sm h-32 focus:border-indigo-500 transition-all resize-none text-slate-800 dark:text-white"
                 />
               </div>
             </div>
