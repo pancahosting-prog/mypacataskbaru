@@ -11,6 +11,7 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
   const [post, setPost] = useState<DrivePost | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string } | null>(null);
 
   useEffect(() => {
     const fetchSharedPost = async () => {
@@ -205,7 +206,26 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
 
           {/* Attachments */}
           <div className="space-y-3">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Lampiran ({post.attachments?.length || 0})</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Lampiran ({post.attachments?.length || 0})</p>
+              <div className="group relative flex items-center gap-1 text-[9px] font-black uppercase text-indigo-500 tracking-wider cursor-pointer">
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M12 16v-4M12 8h.01" />
+                </svg>
+                Mengalami Error 403 saat Unduh?
+                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-72 bg-slate-900 text-white p-4 rounded-2xl shadow-xl text-[10px] normal-case tracking-normal font-medium leading-relaxed z-50 border border-slate-800">
+                  <p className="font-bold text-amber-400 mb-1">Penyebab & Solusi HTTP 403:</p>
+                  Secara default, akun ImageKit baru membatasi akses file non-gambar tanpa tanda tangan.
+                  <ol className="list-decimal ml-3.5 mt-1 space-y-0.5">
+                    <li>Buka dashboard <strong>ImageKit.io</strong>.</li>
+                    <li>Masuk ke <strong>Settings</strong> &gt; <strong>Security</strong>.</li>
+                    <li><strong>Matikan (Disable)</strong> opsi: <em className="text-amber-300">"Restrict unsigned JSON, PDF, JS and other non-image files"</em>.</li>
+                    <li>Simpan pengaturan.</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
             {post.attachments && post.attachments.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
                 {post.attachments.map((file, idx) => (
@@ -229,10 +249,8 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
                     
                     <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       {/* Lihat/Preview Button */}
-                      <a
-                        href={file.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => setPreviewFile(file)}
                         className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
                       >
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -240,7 +258,7 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
                           <circle cx="12" cy="12" r="3" />
                         </svg>
                         Lihat
-                      </a>
+                      </button>
 
                       {/* Download Button */}
                       <a
@@ -284,6 +302,83 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
           )}
         </div>
       </div>
+
+      {/* PREVIEW MODAL */}
+      {previewFile && (
+        <div className="fixed inset-0 z-[200] flex flex-col justify-between p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 md:px-6 rounded-3xl shadow-xl w-full max-w-5xl mx-auto mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 bg-slate-800 rounded-xl shrink-0">
+                {getFileIcon(previewFile.fileType, previewFile.name)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-slate-200 truncate leading-tight" title={previewFile.name}>
+                  {previewFile.name}
+                </p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Preview Dokumen</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Unduh button in header */}
+              <a
+                href={`${previewFile.url}${previewFile.url.includes('?') ? '&' : '?'}ik-attachment=true`}
+                download={previewFile.name}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Unduh
+              </a>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Viewer Stage */}
+          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
+            {previewFile.fileType.startsWith('image/') ? (
+              <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
+                <img
+                  referrerPolicy="no-referrer"
+                  src={previewFile.url}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
+                />
+              </div>
+            ) : (
+              <div className="w-full h-full relative flex flex-col justify-center items-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400 z-0">
+                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen via Google Engine...</p>
+                </div>
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(previewFile.url)}&embedded=true`}
+                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  title="Google Document Viewer"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Footer inside modal */}
+          <div className="text-center text-[8px] font-black text-slate-600 uppercase tracking-widest pt-4">
+            Didukung oleh Google Docs Viewer Engine
+          </div>
+        </div>
+      )}
 
       {/* Footer copyright */}
       <div className="text-center text-[10px] font-bold text-slate-400 uppercase tracking-widest py-8">

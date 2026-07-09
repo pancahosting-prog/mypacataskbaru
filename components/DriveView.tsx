@@ -33,6 +33,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [shareUnit, setShareUnit] = useState<'hours' | 'days' | 'weeks'>('hours');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string } | null>(null);
 
   useEffect(() => {
     // Load ImageKit settings from environment variables first, then fallback to localStorage
@@ -663,12 +664,10 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                     {post.attachments && post.attachments.length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                         {post.attachments.map((file, fIdx) => (
-                          <a
+                          <button
                             key={fIdx}
-                            href={file.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 hover:border-slate-300 hover:bg-white dark:hover:bg-slate-950 transition-all active:scale-98"
+                            onClick={() => setPreviewFile(file)}
+                            className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 hover:border-indigo-200 hover:bg-white dark:hover:bg-slate-950 transition-all text-left w-full active:scale-98"
                           >
                             <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm shrink-0">
                               {getFileIcon(file.fileType, file.name)}
@@ -683,12 +682,11 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                             </div>
                             <div className="text-slate-300 hover:text-indigo-600 shrink-0">
                               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                <polyline points="15 3 21 3 21 9" />
-                                <line x1="10" y1="14" x2="21" y2="3" />
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                <circle cx="12" cy="12" r="3" />
                               </svg>
                             </div>
-                          </a>
+                          </button>
                         ))}
                       </div>
                     )}
@@ -799,6 +797,83 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                 Selesai
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* PREVIEW MODAL */}
+      {previewFile && (
+        <div className="fixed inset-0 z-[200] flex flex-col justify-between p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 md:px-6 rounded-3xl shadow-xl w-full max-w-5xl mx-auto mb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="p-2 bg-slate-800 rounded-xl shrink-0">
+                {getFileIcon(previewFile.fileType, previewFile.name)}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-black text-slate-200 truncate leading-tight" title={previewFile.name}>
+                  {previewFile.name}
+                </p>
+                <p className="text-[9px] text-slate-400 font-bold uppercase mt-1">Preview Dokumen</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {/* Unduh button in header */}
+              <a
+                href={`${previewFile.url}${previewFile.url.includes('?') ? '&' : '?'}ik-attachment=true`}
+                download={previewFile.name}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+              >
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Unduh
+              </a>
+
+              {/* Close Button */}
+              <button
+                onClick={() => setPreviewFile(null)}
+                className="p-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-xl transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          {/* Viewer Stage */}
+          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
+            {previewFile.fileType.startsWith('image/') ? (
+              <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
+                <img
+                  referrerPolicy="no-referrer"
+                  src={previewFile.url}
+                  alt={previewFile.name}
+                  className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
+                />
+              </div>
+            ) : (
+              <div className="w-full h-full relative flex flex-col justify-center items-center">
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400 z-0">
+                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                  <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen via Google Engine...</p>
+                </div>
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(previewFile.url)}&embedded=true`}
+                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  title="Google Document Viewer"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Footer inside modal */}
+          <div className="text-center text-[8px] font-black text-slate-600 uppercase tracking-widest pt-4">
+            Didukung oleh Google Docs Viewer Engine
           </div>
         </div>
       )}
