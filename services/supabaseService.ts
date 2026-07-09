@@ -207,11 +207,16 @@ export const supabaseService = {
   },
 
   // --- Drive Postingan ---
-  async getDrivePosts() {
-    const { data, error } = await supabase
+  async getDrivePosts(username?: string) {
+    let query = supabase
       .from('drive_posts')
-      .select('*, profiles(name)')
-      .order('created_at', { ascending: false });
+      .select('*, profiles(name)');
+    
+    if (username) {
+      query = query.eq('owner_username', username);
+    }
+    
+    const { data, error } = await query.order('created_at', { ascending: false });
     
     if (error) {
       console.error('Error fetching drive posts:', error);

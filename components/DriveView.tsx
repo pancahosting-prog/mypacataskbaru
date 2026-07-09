@@ -56,7 +56,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const fetchPosts = async () => {
     setIsLoading(true);
     try {
-      const data = await supabaseService.getDrivePosts();
+      const data = await supabaseService.getDrivePosts(currentUser.username);
       setPosts(data);
     } catch (err) {
       console.error('Gagal mengambil postingan:', err);
