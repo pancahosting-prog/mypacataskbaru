@@ -34,6 +34,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
     // Load ImageKit settings from environment variables first, then fallback to localStorage
@@ -67,6 +68,30 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const filesArr = Array.from(e.target.files);
+      setSelectedFiles(prev => [...prev, ...filesArr]);
+      
+      const newProgress = { ...uploadProgress };
+      filesArr.forEach(f => {
+        newProgress[f.name] = 'pending';
+      });
+      setUploadProgress(newProgress);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesArr = Array.from(e.dataTransfer.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
       
       const newProgress = { ...uploadProgress };
@@ -456,19 +481,28 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Lampiran File (Semua Jenis Berkas)</label>
                 
                 {/* Drag Drop Area */}
-                <div className="relative border-2 border-dashed border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 rounded-2xl p-6 text-center cursor-pointer bg-white dark:bg-slate-950 transition-all flex flex-col items-center justify-center min-h-[140px] group">
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all flex flex-col items-center justify-center min-h-[140px] group ${
+                    isDragging
+                      ? 'border-indigo-500 bg-indigo-50/20 dark:bg-indigo-950/20 scale-[1.02]'
+                      : 'border-slate-200 dark:border-slate-800 hover:border-indigo-500 dark:hover:border-indigo-500 bg-white dark:bg-slate-950'
+                  }`}
+                >
                   <input
                     type="file"
                     multiple
                     onChange={handleFileChange}
                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                   />
-                  <svg className="w-10 h-10 text-slate-400 group-hover:text-indigo-600 transition-colors mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <svg className={`w-10 h-10 transition-colors mb-2 ${isDragging ? 'text-indigo-600' : 'text-slate-400 group-hover:text-indigo-600'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="17 8 12 3 7 8" />
                     <line x1="12" y1="3" x2="12" y2="15" />
                   </svg>
-                  <p className="text-xs font-black text-slate-600 dark:text-slate-400">Pilih atau Seret Berkas</p>
+                  <p className="text-xs font-black text-slate-600 dark:text-slate-400">Pilih atau Seret Beberapa Berkas</p>
                   <p className="text-[9px] text-slate-400 mt-1">PDF, DOCX, ZIP, JPG, DLL</p>
                 </div>
               </div>

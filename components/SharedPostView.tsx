@@ -206,26 +206,7 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
 
           {/* Attachments */}
           <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Lampiran ({post.attachments?.length || 0})</p>
-              <div className="group relative flex items-center gap-1 text-[9px] font-black uppercase text-indigo-500 tracking-wider cursor-pointer">
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <circle cx="12" cy="12" r="10" />
-                  <path d="M12 16v-4M12 8h.01" />
-                </svg>
-                Mengalami Error 403 saat Unduh?
-                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block w-72 bg-slate-900 text-white p-4 rounded-2xl shadow-xl text-[10px] normal-case tracking-normal font-medium leading-relaxed z-50 border border-slate-800">
-                  <p className="font-bold text-amber-400 mb-1">Penyebab & Solusi HTTP 403:</p>
-                  Secara default, akun ImageKit baru membatasi akses file non-gambar tanpa tanda tangan.
-                  <ol className="list-decimal ml-3.5 mt-1 space-y-0.5">
-                    <li>Buka dashboard <strong>ImageKit.io</strong>.</li>
-                    <li>Masuk ke <strong>Settings</strong> &gt; <strong>Security</strong>.</li>
-                    <li><strong>Matikan (Disable)</strong> opsi: <em className="text-amber-300">"Restrict unsigned JSON, PDF, JS and other non-image files"</em>.</li>
-                    <li>Simpan pengaturan.</li>
-                  </ol>
-                </div>
-              </div>
-            </div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Lampiran ({post.attachments?.length || 0})</p>
             {post.attachments && post.attachments.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
                 {post.attachments.map((file, idx) => (
