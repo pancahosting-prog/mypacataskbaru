@@ -22,12 +22,10 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: 'pending' | 'uploading' | 'success' | 'error' }>({});
   const [errorMessage, setErrorMessage] = useState('');
 
-  // ImageKit states from localStorage
+  // ImageKit states from environment variables (with localStorage fallback)
   const [ikUrl, setIkUrl] = useState('');
   const [ikPublic, setIkPublic] = useState('');
   const [ikPrivate, setIkPrivate] = useState('');
-  const [showSettings, setShowSettings] = useState(false);
-  const [settingsSaved, setSettingsSaved] = useState(false);
 
   // Sharing states
   const [sharingPost, setSharingPost] = useState<DrivePost | null>(null);
@@ -50,10 +48,6 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     setIkPublic(savedPublic);
     setIkPrivate(savedPrivate);
 
-    if (!savedUrl || !savedPublic || !savedPrivate) {
-      setShowSettings(true);
-    }
-
     fetchPosts();
   }, []);
 
@@ -67,17 +61,6 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const saveSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    localStorage.setItem('mypanca_imagekit_url', ikUrl.trim());
-    localStorage.setItem('mypanca_imagekit_public', ikPublic.trim());
-    localStorage.setItem('mypanca_imagekit_private', ikPrivate.trim());
-    
-    setSettingsSaved(true);
-    setTimeout(() => setSettingsSaved(false), 3000);
-    setShowSettings(false);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -181,8 +164,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     if (!title.trim()) return;
 
     if (selectedFiles.length > 0 && (!ikUrl || !ikPublic || !ikPrivate)) {
-      setErrorMessage('Ada file yang dipilih, tetapi kredensial ImageKit belum diisi. Silakan isi terlebih dahulu.');
-      setShowSettings(true);
+      setErrorMessage('Ada file yang dipilih, tetapi konfigurasi ImageKit belum lengkap di environment variables (VITE_IMAGEKIT_URL_ENDPOINT, VITE_IMAGEKIT_PUBLIC_KEY, VITE_IMAGEKIT_PRIVATE_KEY).');
       return;
     }
 
@@ -410,106 +392,10 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
           <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Panca Drive</h3>
           <p className="text-sm text-slate-400">Bagikan postingan, lampirkan berbagai tipe file, dan buat link akses temporary via ImageKit.</p>
         </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl border text-xs font-bold uppercase tracking-wider transition-all shadow-sm ${
-            showSettings || (!ikUrl || !ikPublic || !ikPrivate)
-              ? 'bg-amber-50 border-amber-300 text-amber-700'
-              : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600'
-          }`}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-          Settings ImageKit {!ikUrl && '(Wajib)'}
-        </button>
       </div>
 
-      {/* IMAGEKIT CREDENTIALS SETTINGS */}
-      {showSettings && (
-        <div className="bg-amber-50/50 dark:bg-slate-900/50 border border-amber-200/60 p-8 rounded-[32px] shadow-sm animate-fade-in space-y-4">
-          <div className="flex justify-between items-start">
-            <div>
-              <h4 className="text-lg font-black text-amber-900 dark:text-amber-400">Konfigurasi Penyimpanan ImageKit</h4>
-              <p className="text-xs text-amber-700/80 mt-1">
-                Kredensial ini disimpan aman secara lokal pada browser Anda. Buat akun gratis di{' '}
-                <a href="https://imagekit.io" target="_blank" rel="noopener noreferrer" className="underline font-bold">
-                  imagekit.io
-                </a>{' '}
-                lalu salin detail API Keys Anda di bawah.
-              </p>
-            </div>
-            <button onClick={() => setShowSettings(false)} className="text-amber-500 hover:text-amber-700">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          <form onSubmit={saveSettings} className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-            <div>
-              <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-2 block">
-                URL Endpoint
-              </label>
-              <input
-                required
-                type="text"
-                placeholder="https://ik.imagekit.io/nama_kit"
-                value={ikUrl}
-                onChange={e => setIkUrl(e.target.value)}
-                className="w-full p-3.5 bg-white border border-amber-200 rounded-xl outline-none text-sm font-bold shadow-inner focus:border-amber-500 transition-all text-amber-950"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-2 block">
-                Public Key
-              </label>
-              <input
-                required
-                type="text"
-                placeholder="public_xxxxxxxxxx="
-                value={ikPublic}
-                onChange={e => setIkPublic(e.target.value)}
-                className="w-full p-3.5 bg-white border border-amber-200 rounded-xl outline-none text-sm font-bold shadow-inner focus:border-amber-500 transition-all text-amber-950"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-amber-800 uppercase tracking-widest mb-2 block">
-                Private Key
-              </label>
-              <input
-                required
-                type="password"
-                placeholder="private_xxxxxxxxxx="
-                value={ikPrivate}
-                onChange={e => setIkPrivate(e.target.value)}
-                className="w-full p-3.5 bg-white border border-amber-200 rounded-xl outline-none text-sm font-bold shadow-inner focus:border-amber-500 transition-all text-amber-950"
-              />
-            </div>
-            <div className="md:col-span-3 flex justify-end">
-              <button
-                type="submit"
-                className="px-8 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md transition-all text-sm uppercase tracking-wider"
-              >
-                Simpan Konfigurasi
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {settingsSaved && (
-        <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-4 rounded-2xl font-bold text-xs flex items-center gap-2 animate-fade-in">
-          <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Pengaturan ImageKit berhasil disimpan secara lokal! Anda dapat mulai mengunggah file sekarang.
-        </div>
-      )}
-
       {/* WARNING IF NO IMAGEKIT */}
-      {!ikUrl && !showSettings && (
+      {!ikUrl && (
         <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex items-start gap-3">
             <svg className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -518,13 +404,12 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
               <line x1="12" y1="17" x2="12.01" y2="17" />
             </svg>
             <div>
-              <p className="font-bold text-amber-900">Upload Lampiran Memerlukan ImageKit</p>
-              <p className="text-xs text-amber-700">Anda dapat menulis postingan teks tanpa lampiran sekarang, atau isi kredensial ImageKit Anda untuk bisa melampirkan berkas (PDF, DOCX, ZIP, Gambar, dll).</p>
+              <p className="font-bold text-amber-900">Upload Lampiran Memerlukan Konfigurasi Env ImageKit</p>
+              <p className="text-xs text-amber-700">
+                Silakan isi environment variables <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_URL_ENDPOINT</code>, <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PUBLIC_KEY</code>, dan <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PRIVATE_KEY</code> untuk mengaktifkan fitur upload lampiran.
+              </p>
             </div>
           </div>
-          <button onClick={() => setShowSettings(true)} className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition-all shrink-0">
-            Atur Sekarang
-          </button>
         </div>
       )}
 
