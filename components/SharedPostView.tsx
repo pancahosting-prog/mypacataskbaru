@@ -207,34 +207,56 @@ export const SharedPostView: React.FC<SharedPostViewProps> = ({ shareToken, onBa
           <div className="space-y-3">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Lampiran ({post.attachments?.length || 0})</p>
             {post.attachments && post.attachments.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {post.attachments.map((file, idx) => (
-                  <a
+                  <div
                     key={idx}
-                    href={file.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-4 p-4 rounded-3xl border border-slate-100 bg-white hover:border-indigo-200 hover:bg-indigo-50/10 transition-all shadow-sm active:scale-98 group"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-3xl border border-slate-100 bg-white shadow-sm hover:border-indigo-100 transition-all"
                   >
-                    <div className="p-3 bg-slate-50 group-hover:bg-indigo-50 rounded-2xl transition-colors shrink-0">
-                      {getFileIcon(file.fileType, file.name)}
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="p-3 bg-slate-50 rounded-2xl shrink-0">
+                        {getFileIcon(file.fileType, file.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black text-slate-700 truncate leading-tight" title={file.name}>
+                          {file.name}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-none">
+                          {formatBytes(file.size)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-black text-slate-700 truncate leading-tight group-hover:text-indigo-600 transition-colors" title={file.name}>
-                        {file.name}
-                      </p>
-                      <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-none">
-                        {formatBytes(file.size)}
-                      </p>
+                    
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                      {/* Lihat/Preview Button */}
+                      <a
+                        href={file.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-4 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-800 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                        Lihat
+                      </a>
+
+                      {/* Download Button */}
+                      <a
+                        href={`${file.url}${file.url.includes('?') ? '&' : '?'}ik-attachment=true`}
+                        download={file.name}
+                        className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-md shadow-indigo-100 active:scale-95"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Unduh
+                      </a>
                     </div>
-                    <div className="text-slate-300 group-hover:text-indigo-600 transition-colors shrink-0 p-1">
-                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                    </div>
-                  </a>
+                  </div>
                 ))}
               </div>
             ) : (
