@@ -1,0 +1,572 @@
+
+import React, { useState, useEffect } from 'react';
+import { Task, TaskLog, CalendarViewType } from './types';
+import CalendarHeader from './components/CalendarHeader';
+import MonthView from './components/MonthView';
+import WeekView from './components/WeekView';
+import DayView from './components/DayView';
+import ListView from './components/ListView';
+import TaskCard from './components/TaskCard';
+import TaskModal from './components/TaskModal';
+import DayTaskPicker from './components/DayTaskPicker';
+import AnalyticsView from './components/AnalyticsView';
+import AboutModal from './components/AboutModal';
+import { supabaseService } from './services/supabaseService';
+import { DriveView } from './components/DriveView';
+import { SharedPostView } from './components/SharedPostView';
+
+interface UserSession {
+  username: string;
+  role: 'superadmin' | 'user';
+  name: string;
+}
+
+interface Notification {
+  id: string;
+  type?: 'invitation' | 'info';
+  taskId?: string;
+  title: string;
+  date: string;
+  priority: string;
+  message: string;
+  read: boolean;
+}
+
+const App: React.FC = () => {
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+  const [loginData, setLoginData] = useState({ username: '', password: '' });
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [shareDriveToken, setShareDriveToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('shareDrive');
+    if (token) {
+      setShareDriveToken(token);
+    }
+  }, []);
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive'>('analytics'); 
+  const [assignSubView, setAssignSubView] = useState<CalendarViewType>('month');
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isDayPickerOpen, setIsDayPickerOpen] = useState(false);
+  const [dayPickerDate, setDayPickerDate] = useState<Date | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
+
+  const [allUsers, setAllUsers] = useState<any[]>([]);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user', name: '' });
+  const [targetUser, setTargetUser] = useState<string>('');
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [userSearch, setUserSearch] = useState('');
+  const [targetUserTasks, setTargetUserTasks] = useState<Task[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  const [stickyNote, setStickyNote] = useState('');
+  const [isNoteOpen, setIsNoteOpen] = useState(false);
+
+  const [isBroadcastOpen, setIsBroadcastOpen] = useState(false);
+  const [broadcastData, setBroadcastData] = useState({ recipient: 'all', title: '', message: '', priority: 'Medium' });
+
+  useEffect(() => {
+    if (currentUser) {
+      fetchData();
+      fetchNotifs();
+      fetchSticky();
+      fetchUsers();
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [theme]);
+
+  const fetchNotifs = async () => {
+    if (!currentUser) return;
+    const data = await supabaseService.getNotifications(currentUser.username);
+    setNotifications(data);
+  };
+
+  const fetchSticky = async () => {
+    if (!currentUser) return;
+    const content = await supabaseService.getStickyNote(currentUser.username);
+    setStickyNote(content);
+  };
+
+  const saveStickyNote = async (val: string) => {
+    if (!currentUser) return;
+    setStickyNote(val);
+    await supabaseService.saveStickyNote(currentUser.username, val);
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoggingIn(true);
+    setLoginError('');
+    try {
+      const res = await supabaseService.authenticate(loginData.username, loginData.password);
+      if (res.success) {
+        setCurrentUser(res.user);
+      } else {
+        setLoginError(res.message || 'Login gagal');
+      }
+    } catch (err) {
+      setLoginError('Koneksi ke database gagal.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const fetchData = async () => {
+    if (!currentUser) return;
+    setIsSyncing(true);
+    try {
+      // isTrackingView = false karena ini untuk view utama (Kalender/Dashboard)
+      const data = await supabaseService.getTasks(currentUser, false);
+      setTasks(data);
+    } catch (error) {
+      console.error('Fetch tasks failed:', error);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const fetchUsers = async () => {
+    const data = await supabaseService.getUsers();
+    setAllUsers(data);
+  };
+
+  const fetchTargetTasks = async (username: string) => {
+    setIsSyncing(true);
+    try {
+      // isTrackingView = true karena kita ingin melihat semua tugas user target (bukan milik kita sendiri)
+      const data = await supabaseService.getTasks({ username, role: 'user' }, true);
+      setTargetUserTasks(data);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const toggleAssignee = (username: string) => {
+    setSelectedAssignees(prev => 
+      prev.includes(username) ? prev.filter(u => u !== username) : [...prev, username]
+    );
+    setTargetUser(username);
+    fetchTargetTasks(username);
+  };
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSyncing(true);
+    await supabaseService.addUser(newUser);
+    setNewUser({ username: '', password: '', role: 'user', name: '' });
+    await fetchUsers();
+    setIsSyncing(false);
+  };
+
+  const handleDeleteUser = async (username: string) => {
+    if (confirm(`Hapus user ${username}?`)) {
+      setIsSyncing(true);
+      await supabaseService.deleteUser(username);
+      await fetchUsers();
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (confirm('Apakah Anda yakin ingin menghapus tugas ini secara permanen?')) {
+      setIsSyncing(true);
+      try {
+        await supabaseService.deleteTask(taskId);
+        await fetchData();
+        if (targetUser) await fetchTargetTasks(targetUser);
+      } catch (e) {
+        console.error('Delete task error:', e);
+        alert('Gagal menghapus tugas.');
+      } finally {
+        setIsSyncing(false);
+      }
+    }
+  };
+
+  const handleSaveTask = async (updatedTask: Task) => {
+    if (!currentUser) return;
+    setIsSyncing(true);
+    try {
+      if (updatedTask.pendingCollaborators && updatedTask.pendingCollaborators.length > 0) {
+        for (const username of updatedTask.pendingCollaborators) {
+           await supabaseService.sendNotification({
+             recipient_username: username,
+             type: 'invitation',
+             taskId: updatedTask.id,
+             title: 'Undangan Kolaborasi',
+             priority: 'Medium',
+             message: `${currentUser.name} mengundang Anda untuk berkolaborasi pada: ${updatedTask.title}`
+           });
+        }
+      }
+
+      const isAssignmentMode = (view === 'assign' || view === 'tracking');
+      
+      if (isAssignmentMode && view === 'assign' && selectedAssignees.length > 0) {
+        for (const username of selectedAssignees) {
+          const userObj = allUsers.find(u => u.username === username);
+          const taskForUser = { 
+            ...updatedTask, 
+            id: `task_${Date.now()}_${username}`, 
+            employeeName: userObj?.name || username 
+          };
+          await supabaseService.saveTask(taskForUser, username);
+          
+          await supabaseService.sendNotification({
+            recipient_username: username,
+            title: 'Tugas Baru Ditugaskan',
+            priority: updatedTask.priority,
+            message: `Admin menugaskan Anda: ${updatedTask.title}`
+          });
+        }
+      } else {
+        await supabaseService.saveTask(updatedTask, updatedTask.owner || currentUser.username);
+      }
+      
+      await fetchData();
+      if (targetUser) await fetchTargetTasks(targetUser);
+    } catch (e) {
+      console.error('Save task error:', e);
+      alert('Gagal menyimpan data.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!currentUser) return;
+    await supabaseService.markNotifRead(currentUser.username);
+    fetchNotifs();
+  };
+
+  const handleSendBroadcast = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSyncing(true);
+    const targets = broadcastData.recipient === 'all' 
+      ? allUsers.filter(u => u.username !== 'superadmin').map(u => u.username) 
+      : [broadcastData.recipient];
+      
+    for (const username of targets) {
+      await supabaseService.sendNotification({
+        recipient_username: username,
+        title: broadcastData.title,
+        priority: broadcastData.priority,
+        message: broadcastData.message
+      });
+    }
+    setIsBroadcastOpen(false);
+    setBroadcastData({ recipient: 'all', title: '', message: '', priority: 'Medium' });
+    setIsSyncing(false);
+    alert('Pesan berhasil disiarkan!');
+  };
+
+  const handleOpenTask = (task: Task, logIdx: number) => {
+    setSelectedTask(task);
+    setSelectedLogIndex(logIdx);
+    setIsModalOpen(true);
+  };
+
+  const changeDate = (amount: number) => {
+    const newDate = new Date(currentDate);
+    if (view === 'month' || view === 'assign') newDate.setMonth(currentDate.getMonth() + amount);
+    else if (view === 'week') newDate.setDate(currentDate.getDate() + amount * 7);
+    else if (view === 'day') newDate.setDate(currentDate.getDate() + amount);
+    setCurrentDate(newDate);
+  };
+
+  const filteredUsers = allUsers.filter(u => u.username !== 'superadmin' && (u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.username.toLowerCase().includes(userSearch.toLowerCase())));
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (shareDriveToken) {
+    return (
+      <SharedPostView
+        shareToken={shareDriveToken}
+        onBackToApp={() => {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          setShareDriveToken(null);
+        }}
+      />
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-[#F0F2F5] flex items-center justify-center p-6">
+        <div className="bg-white p-8 md:p-12 rounded-[40px] shadow-xl w-full max-w-md border border-slate-100">
+          <div className="text-center mb-10">
+            <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 p-2">
+              <img src="https://ahlifumigasi.com/wp-content/uploads/2025/12/logopancaapp.png" alt="Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <h1 className="text-3xl font-black text-slate-800 tracking-tight">MyPanca</h1>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">smart task manager assistant</p>
+            </div>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Username</label>
+              <input required type="text" value={loginData.username} onChange={e => setLoginData({...loginData, username: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all" />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase mb-2 block tracking-widest">Password</label>
+              <input required type="password" value={loginData.password} onChange={e => setLoginData({...loginData, password: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl font-bold outline-none focus:border-indigo-500 transition-all" />
+            </div>
+            {loginError && <p className="text-rose-500 text-xs font-bold text-center animate-pulse">{loginError}</p>}
+            <button disabled={isLoggingIn} type="submit" className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all disabled:opacity-50">
+              {isLoggingIn ? 'Memvalidasi...' : 'Masuk Sekarang'}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`min-h-screen flex transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0F172A]' : 'bg-[#F0F2F5]'}`}>
+      <aside className={`${isSidebarCollapsed ? 'w-[64px]' : 'w-72'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col px-2 py-6 fixed lg:sticky left-0 top-0 h-screen transition-all z-[100]`}>
+        <div className="flex items-center mb-10 h-10 px-1 overflow-hidden">
+          <div className="flex items-center gap-3 shrink-0 lg:pl-2">
+            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="w-10 h-10 bg-white border border-slate-100 rounded-lg flex items-center justify-center p-1 shadow-sm transition-all overflow-hidden shrink-0">
+              <img src="https://ahlifumigasi.com/wp-content/uploads/2025/12/logopancaapp.png" alt="Logo" className="w-full h-full object-contain" />
+            </button>
+            {!isSidebarCollapsed && (
+              <div className="flex flex-col gap-0">
+                <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-none">MyPanca</h1>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">smart assistant</p>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto no-scrollbar">
+          <nav className="space-y-2">
+            <button onClick={() => setView('analytics')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'analytics' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
+              {!isSidebarCollapsed && <span>Dashboard</span>}
+            </button>
+            <button onClick={() => setView('list')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
+              {!isSidebarCollapsed && <span>Tugas</span>}
+            </button>
+            <button onClick={() => setView('month')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${['month', 'week', 'day'].includes(view) ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg></div>
+              {!isSidebarCollapsed && <span>Kalender</span>}
+            </button>
+            <button onClick={() => setView('drive')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'drive' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+              </div>
+              {!isSidebarCollapsed && <span>Drive</span>}
+            </button>
+            {currentUser.role === 'superadmin' && (
+              <>
+                <button onClick={() => setView('assign')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></div>
+                  {!isSidebarCollapsed && <span>Kirim Tugas</span>}
+                </button>
+                <button onClick={() => setView('tracking')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'tracking' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v4l2 2"/></svg></div>
+                  {!isSidebarCollapsed && <span>Tracking Tugas</span>}
+                </button>
+                <button onClick={() => setView('users')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'users' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                  {!isSidebarCollapsed && <span>User</span>}
+                </button>
+              </>
+            )}
+            <button onClick={() => setView('messages')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'messages' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'} relative`}>
+              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>{unreadCount > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>}</div>
+              {!isSidebarCollapsed && <span>Pesan</span>}
+            </button>
+            <button onClick={() => setIsAboutOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all text-slate-500 hover:bg-slate-50`}>
+              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
+              {!isSidebarCollapsed && <span>Tentang</span>}
+            </button>
+          </nav>
+        </div>
+
+        <div className="pt-4 mt-auto border-t border-slate-100 px-2">
+           <button onClick={() => setCurrentUser(null)} className="w-full flex items-center justify-center p-3 rounded-xl text-rose-500 hover:bg-rose-50 mb-4 transition-all"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+           <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-2'} py-2 bg-slate-50 rounded-2xl border border-slate-200`}>
+              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">{currentUser.name.charAt(0)}</div>
+              {!isSidebarCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p><p className="text-[9px] text-slate-400 uppercase font-bold">{currentUser.role}</p></div>}
+           </div>
+        </div>
+      </aside>
+
+      <main className={`flex-1 ${isSidebarCollapsed ? 'pl-20' : 'pl-80'} lg:pl-0 lg:ml-12 p-4 lg:p-14 flex flex-col gap-8 w-full max-w-screen-2xl transition-all relative`}>
+        {isSyncing && (
+          <div className="fixed top-6 right-6 z-[300] bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-slate-100 shadow-lg flex items-center gap-3 animate-fade-in">
+             <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+             <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Sinkronisasi Database...</span>
+          </div>
+        )}
+
+        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+           <div><h2 className="text-2xl lg:text-4xl font-black text-slate-800 dark:text-white tracking-tight">Halo, {currentUser.name}!</h2></div>
+           <button onClick={() => setIsNoteOpen(true)} className="flex items-center gap-5 bg-amber-50 p-2.5 pr-6 rounded-2xl border border-amber-200 shadow-sm transition-all group active:scale-95">
+             <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center text-white shadow-md group-hover:rotate-12 transition-transform"><svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+             <div className="text-left"><p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Stickynote Pribadi</p></div>
+           </button>
+        </section>
+
+        {isNoteOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+            <div className="bg-[#FFF9E5] dark:bg-slate-900 w-full max-w-lg rounded-[32px] shadow-2xl border border-amber-200 overflow-hidden animate-fade-in">
+               <div className="p-8 pb-4 flex justify-between items-center border-b border-amber-100"><h3 className="text-lg font-black text-amber-900 dark:text-white uppercase tracking-widest">Stickynote</h3><button onClick={() => setIsNoteOpen(false)} className="text-amber-400 hover:text-amber-600"><svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+               <div className="p-8"><textarea value={stickyNote} onChange={(e) => saveStickyNote(e.target.value)} className="w-full h-80 bg-transparent text-amber-900 dark:text-slate-200 outline-none resize-none font-medium placeholder:text-amber-200" placeholder="Tulis catatan harian Anda di sini..." /></div>
+            </div>
+          </div>
+        )}
+
+        {isBroadcastOpen && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+             <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[32px] shadow-2xl border border-slate-200 overflow-hidden animate-fade-in">
+                <form onSubmit={handleSendBroadcast}>
+                  <div className="p-8 pb-4 border-b border-slate-100 flex justify-between items-center"><h3 className="text-xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Kirim Notifikasi</h3><button type="button" onClick={() => setIsBroadcastOpen(false)} className="text-slate-400 hover:text-slate-600"><svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+                  <div className="p-8 space-y-6">
+                    <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Penerima</label><select required value={broadcastData.recipient} onChange={e => setBroadcastData({...broadcastData, recipient: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-sm"><option value="all">Semua User</option>{allUsers.filter(u => u.username !== 'superadmin').map(u => (<option key={u.username} value={u.username}>{u.name} (@{u.username})</option>))}</select></div>
+                    <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Isi Pesan</label><textarea required value={broadcastData.message} onChange={e => setBroadcastData({...broadcastData, message: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-sm h-32" /></div>
+                  </div>
+                  <div className="p-8 pt-0"><button type="submit" className="w-full py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-95 transition-all">Kirim Sekarang</button></div>
+                </form>
+             </div>
+          </div>
+        )}
+
+        <section className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 flex-1 flex flex-col overflow-hidden min-h-[600px] shadow-sm mb-10 w-full">
+           {view === 'drive' && (
+             <DriveView currentUser={currentUser} />
+           )}
+
+           {view === 'messages' && (
+             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+                <div className="flex justify-between items-center mb-10">
+                   <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Kotak Masuk</h3>
+                   <div className="flex gap-4">
+                     {currentUser.role === 'superadmin' && <button onClick={() => setIsBroadcastOpen(true)} className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg">Broadcast</button>}
+                     <button onClick={markAllAsRead} className="px-6 py-3 bg-slate-100 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all">Tandai Dibaca</button>
+                   </div>
+                </div>
+                <div className="space-y-4 overflow-y-auto max-h-[60vh] no-scrollbar">
+                   {notifications.length === 0 ? <div className="py-20 text-center text-slate-300 font-bold uppercase tracking-widest text-xs">Belum ada pesan masuk</div> : notifications.map(n => (
+                     <div key={n.id} className={`p-6 rounded-[24px] border transition-all ${n.read ? 'bg-white opacity-60' : 'bg-indigo-50/30 border-indigo-100 shadow-sm'}`}>
+                        <div className="flex justify-between items-start mb-2"><div className="flex items-center gap-2">{!n.read && <span className="w-2 h-2 bg-indigo-600 rounded-full"></span>}<span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">{n.type === 'invitation' ? 'Undangan Kolaborasi' : 'Notifikasi'}</span></div><span className="text-[10px] font-bold text-slate-400">{new Date(n.date).toLocaleDateString()}</span></div>
+                        <h4 className="text-base font-black text-slate-800 dark:text-white mb-2">{n.title}</h4><p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{n.message}</p>
+                     </div>
+                   ))}
+                </div>
+             </div>
+           )}
+
+           {view === 'users' && currentUser.role === 'superadmin' && (
+             <div className="p-8 lg:p-14 animate-fade-in space-y-10">
+                <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-200">
+                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest mb-6">Tambah User Baru</h3>
+                  <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <input required type="text" placeholder="Nama" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" />
+                    <input required type="text" placeholder="Username" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" />
+                    <input required type="password" placeholder="Password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" />
+                    <button type="submit" className="bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-indigo-700 transition-all">Simpan</button>
+                  </form>
+                </div>
+                <div className="overflow-hidden border border-slate-100 rounded-3xl bg-white">
+                  <table className="w-full text-left">
+                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest"><tr className="border-b"><th className="p-6">User</th><th className="p-6">Role</th><th className="p-6 text-right">Aksi</th></tr></thead>
+                    <tbody>{allUsers.map(u => (<tr key={u.username} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="p-6"><div><p className="font-bold text-slate-800">{u.name}</p><p className="text-xs text-slate-400">@{u.username}</p></div></td><td className="p-6"><span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${u.role === 'superadmin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>{u.role}</span></td><td className="p-6 text-right">{u.username !== 'superadmin' && <button onClick={() => handleDeleteUser(u.username)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg></button>}</td></tr>))}</tbody>
+                  </table>
+                </div>
+             </div>
+           )}
+
+           {view === 'assign' && currentUser.role === 'superadmin' && (
+             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+                <div className="mb-10 flex flex-col md:flex-row justify-between items-end gap-6">
+                  <div><h3 className="text-2xl font-black text-slate-800 tracking-tight">Penugasan Team</h3><p className="text-sm text-slate-400">Pilih user untuk menugaskan pekerjaan bersama.</p></div>
+                  <div className="flex gap-4"><button onClick={() => setSelectedAssignees(allUsers.filter(u => u.username !== 'superadmin').map(u => u.username))} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all">Pilih Semua</button><button onClick={() => setSelectedAssignees([])} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-all">Hapus Semua</button></div>
+                </div>
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                   <div className="space-y-4 max-h-[500px] overflow-y-auto no-scrollbar pr-2">
+                     <div className="relative mb-4"><svg className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><input type="text" placeholder="Cari user..." value={userSearch} onChange={e => setUserSearch(e.target.value)} className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:border-indigo-500 text-sm font-bold transition-all" /></div>
+                     {filteredUsers.map(u => (<button key={u.username} onClick={() => toggleAssignee(u.username)} className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all active:scale-95 ${selectedAssignees.includes(u.username) ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg' : 'bg-white border-slate-100 hover:border-slate-300'}`}><div className={`w-10 h-10 rounded-full flex items-center justify-center font-black ${selectedAssignees.includes(u.username) ? 'bg-white/20' : 'bg-indigo-50 text-indigo-600'}`}>{u.name.charAt(0)}</div><div className="text-left font-bold truncate">{u.name}</div></button>))}
+                   </div>
+                   <div className="lg:col-span-2">
+                     {selectedAssignees.length > 0 ? (
+                       <div className="space-y-8 animate-fade-in">
+                         <CalendarHeader currentDate={currentDate} view={assignSubView} setView={setAssignSubView} onPrev={() => changeDate(-1)} onNext={() => changeDate(1)} onToday={() => setCurrentDate(new Date())} />
+                         {assignSubView === 'month' && <MonthView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                         {assignSubView === 'week' && <WeekView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                         {assignSubView === 'day' && <DayView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                         
+                         <div className="flex justify-end pt-4">
+                           <button onClick={() => { setSelectedTask(null); setSelectedLogIndex(-1); setDayPickerDate(new Date()); setIsModalOpen(true); }} className="px-8 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 transition-all active:scale-95">+ Assign Team Task</button>
+                         </div>
+                       </div>
+                     ) : <div className="h-full flex flex-col items-center justify-center py-20 text-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 font-black uppercase tracking-widest text-[10px]">Pilih user dari panel kiri untuk menugaskan pekerjaan</div>}
+                   </div>
+                </div>
+             </div>
+           )}
+
+           {view === 'tracking' && currentUser.role === 'superadmin' && (
+             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+                <div className="mb-10 flex justify-between items-center"><div><h3 className="text-2xl font-black text-slate-800 tracking-tight">Tracking Per User</h3></div><select value={targetUser} onChange={e => { setTargetUser(e.target.value); if(e.target.value) fetchTargetTasks(e.target.value); }} className="p-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none w-80 focus:border-indigo-500 transition-all shadow-sm"><option value="">Pilih User Untuk Track</option>{allUsers.filter(u => u.username !== 'superadmin').map(u => (<option key={u.username} value={u.username}>{u.name} (@{u.username})</option>))}</select></div>
+                {targetUser ? <ListView tasks={targetUserTasks} onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} onDeleteTask={handleDeleteTask} onColorChange={() => {}} /> : <div className="flex-1 flex flex-col items-center justify-center py-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 uppercase font-black tracking-widest text-[10px]">Pilih user di atas untuk melihat laporan pekerjaan mereka</div>}
+             </div>
+           )}
+
+           {['month', 'week', 'day'].includes(view) && (
+             <div className="px-8 lg:px-14 pt-10 pb-6"><CalendarHeader currentDate={currentDate} view={view as CalendarViewType} setView={setView} onPrev={() => changeDate(-1)} onNext={() => changeDate(1)} onToday={() => setCurrentDate(new Date())} /></div>
+           )}
+
+           <div className="flex-1 p-8 lg:p-14 overflow-y-auto no-scrollbar">
+              {view === 'month' && <MonthView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+              {view === 'week' && <WeekView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+              {view === 'day' && <DayView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+              {view === 'list' && <ListView tasks={tasks} onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} onDeleteTask={handleDeleteTask} onColorChange={() => {}} onAddNew={() => { setSelectedTask(null); setSelectedLogIndex(-1); setIsModalOpen(true); }} />}
+              {view === 'analytics' && <AnalyticsView tasks={tasks} />}
+           </div>
+        </section>
+      </main>
+
+      <TaskModal isOpen={isModalOpen} task={selectedTask} logIndex={selectedLogIndex} prefilledDate={dayPickerDate?.toISOString()} onClose={() => { setIsModalOpen(false); setSelectedTask(null); setSelectedLogIndex(-1); }} onSave={handleSaveTask} allUsers={allUsers.filter(u => u.username !== currentUser?.username && u.username !== 'superadmin')} />
+      <DayTaskPicker isOpen={isDayPickerOpen} date={dayPickerDate} allTasks={tasks} onClose={() => setIsDayPickerOpen(false)} onSelectTask={(t) => handleOpenTask(t, t.logs.length - 1)} onAddTask={(d) => { setSelectedTask(null); setSelectedLogIndex(-1); setDayPickerDate(d); setIsModalOpen(true); setIsDayPickerOpen(false); }} onDeleteTask={handleDeleteTask} onRescheduleTask={async (tid, date) => {
+          const task = tasks.find(t => t.id === tid);
+          if (task && date) {
+            const updated = { 
+              ...task, 
+              endDate: date.toISOString(),
+              status: 'Proses' as any,
+              logs: [...task.logs, { 
+                status: 'Proses' as any, 
+                progress: task.progress, 
+                date: date.toISOString(), 
+                description: 'Dilanjutkan kembali pada: ' + date.toLocaleDateString('id-ID')
+              }] 
+            };
+            await handleSaveTask(updated);
+            setIsDayPickerOpen(false);
+          }
+      }} onQuickUpdateStatus={() => {}} />
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
+    </div>
+  );
+};
+
+export default App;
