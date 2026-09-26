@@ -50,3 +50,48 @@ export interface DrivePost {
   created_at?: string;
 }
 
+export type UserRole = 'superadmin' | 'user' | 'engineer' | 'commercial' | 'finance';
+
+export type ProjectFolderCategory = 'engineering' | 'commercial' | 'finance' | 'documentation';
+
+export interface ProjectFile {
+  id: string;
+  name: string;
+  url: string;
+  fileType: string;
+  size?: number;
+  uploadedBy: string;
+  uploadedAt: string;
+  notes?: string;
+}
+
+export interface ProjectNote {
+  id: string;
+  title: string;
+  content: string;
+  category: 'SLD / Wiring' | 'Konfigurasi Sistem' | 'Kendala & Solusi' | 'Testing & Commissioning' | 'Catatan Umum';
+  author: string;
+  createdAt: string;
+}
+
+export interface Project {
+  id: string;
+  code?: string;
+  title: string;
+  clientName: string;
+  location?: string;
+  status: 'Perencanaan' | 'Sedang Berjalan' | 'Selesai' | 'Garansi';
+  leadEngineer?: string;
+  startDate: string;
+  completionDate?: string;
+  description?: string;
+  files: {
+    engineering: ProjectFile[];
+    commercial: ProjectFile[];
+    finance: ProjectFile[];
+    documentation: ProjectFile[];
+  };
+  notes: ProjectNote[];
+  created_at?: string;
+  updated_at?: string;
+}

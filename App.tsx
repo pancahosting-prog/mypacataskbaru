@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Task, TaskLog, CalendarViewType } from './types';
+import { Task, TaskLog, CalendarViewType, Project } from './types';
 import CalendarHeader from './components/CalendarHeader';
 import MonthView from './components/MonthView';
 import WeekView from './components/WeekView';
@@ -14,6 +14,7 @@ import AboutModal from './components/AboutModal';
 import { supabaseService } from './services/supabaseService';
 import { DriveView } from './components/DriveView';
 import { SharedPostView } from './components/SharedPostView';
+import { ProjectView } from './components/ProjectView';
 
 interface UserSession {
   username: string;
@@ -48,8 +49,9 @@ const App: React.FC = () => {
   }, []);
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive'>('analytics'); 
+  const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive' | 'project'>('analytics'); 
   const [assignSubView, setAssignSubView] = useState<CalendarViewType>('month');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
@@ -63,6 +65,9 @@ const App: React.FC = () => {
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
   const [newUser, setNewUser] = useState({ username: '', password: '', role: 'user', name: '' });
+  const [editingUser, setEditingUser] = useState<{ username: string; name: string; role: string; password: string } | null>(null);
+  const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
+  const [showModalPassword, setShowModalPassword] = useState(false);
   const [targetUser, setTargetUser] = useState<string>('');
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [userSearch, setUserSearch] = useState('');
@@ -81,6 +86,7 @@ const App: React.FC = () => {
       fetchNotifs();
       fetchSticky();
       fetchUsers();
+      fetchProjects();
     }
   }, [currentUser]);
 
@@ -144,6 +150,28 @@ const App: React.FC = () => {
     setAllUsers(data);
   };
 
+  const fetchProjects = async () => {
+    try {
+      const data = await supabaseService.getProjects();
+      setProjects(data);
+    } catch (e) {
+      console.error('Fetch projects failed:', e);
+    }
+  };
+
+  const handleSaveProject = async (projectToSave: Project) => {
+    setIsSyncing(true);
+    try {
+      const updatedList = await supabaseService.saveProject(projectToSave);
+      setProjects(updatedList);
+    } catch (e) {
+      console.error('Save project failed:', e);
+      alert('Gagal menyimpan project.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const fetchTargetTasks = async (username: string) => {
     setIsSyncing(true);
     try {
@@ -170,6 +198,46 @@ const App: React.FC = () => {
     setNewUser({ username: '', password: '', role: 'user', name: '' });
     await fetchUsers();
     setIsSyncing(false);
+  };
+
+  const [showPasswordMap, setShowPasswordMap] = useState<Record<string, boolean>>({});
+
+  const toggleShowPassword = (username: string) => {
+    setShowPasswordMap(prev => ({
+      ...prev,
+      [username]: !prev[username]
+    }));
+  };
+
+  const handleOpenEditUser = (user: any) => {
+    setEditingUser({
+      username: user.username,
+      name: user.name || '',
+      role: user.role || 'user',
+      password: user.password || ''
+    });
+    setIsEditUserModalOpen(true);
+  };
+
+  const handleSaveEditUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    setIsSyncing(true);
+    try {
+      await supabaseService.updateUser(editingUser.username, {
+        name: editingUser.name,
+        role: editingUser.role,
+        password: editingUser.password
+      });
+      setIsEditUserModalOpen(false);
+      setEditingUser(null);
+      await fetchUsers();
+    } catch (err) {
+      console.error('Update user failed:', err);
+      alert('Gagal mengupdate user.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleDeleteUser = async (username: string) => {
@@ -374,6 +442,14 @@ const App: React.FC = () => {
               </div>
               {!isSidebarCollapsed && <span>Drive</span>}
             </button>
+            <button onClick={() => setView('project')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'project' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              {!isSidebarCollapsed && <span>Project Database</span>}
+            </button>
             {currentUser.role === 'superadmin' && (
               <>
                 <button onClick={() => setView('assign')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -455,6 +531,14 @@ const App: React.FC = () => {
              <DriveView currentUser={currentUser} />
            )}
 
+           {view === 'project' && (
+             <ProjectView
+               currentUser={currentUser}
+               projects={projects}
+               onSaveProject={handleSaveProject}
+             />
+           )}
+
            {view === 'messages' && (
              <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
                 <div className="flex justify-between items-center mb-10">
@@ -477,19 +561,86 @@ const App: React.FC = () => {
 
            {view === 'users' && currentUser.role === 'superadmin' && (
              <div className="p-8 lg:p-14 animate-fade-in space-y-10">
-                <div className="bg-slate-50 p-8 rounded-[32px] border border-slate-200">
-                  <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest mb-6">Tambah User Baru</h3>
-                  <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <input required type="text" placeholder="Nama" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" />
-                    <input required type="text" placeholder="Username" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" />
-                    <input required type="password" placeholder="Password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800" />
+                <div className="bg-slate-50 dark:bg-slate-950 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800">
+                  <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-widest mb-6">Tambah User Baru</h3>
+                  <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                    <input required type="text" placeholder="Nama" value={newUser.name} onChange={e => setNewUser({...newUser, name: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-900 dark:border-slate-800" />
+                    <input required type="text" placeholder="Username" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-900 dark:border-slate-800" />
+                    <input required type="password" placeholder="Password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-900 dark:border-slate-800" />
+                    <select value={newUser.role} onChange={e => setNewUser({...newUser, role: e.target.value})} className="p-3.5 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm text-slate-800 dark:text-white dark:bg-slate-900 dark:border-slate-800">
+                      <option value="user">User / Standard</option>
+                      <option value="engineer">Engineer</option>
+                      <option value="commercial">Commercial / Sales</option>
+                      <option value="finance">Finance / Admin</option>
+                      <option value="superadmin">Superadmin</option>
+                    </select>
                     <button type="submit" className="bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg hover:bg-indigo-700 transition-all">Simpan</button>
                   </form>
                 </div>
-                <div className="overflow-hidden border border-slate-100 rounded-3xl bg-white">
+                <div className="overflow-hidden border border-slate-100 dark:border-slate-800 rounded-3xl bg-white dark:bg-slate-900">
                   <table className="w-full text-left">
-                    <thead className="bg-slate-50 text-[10px] font-black text-slate-400 uppercase tracking-widest"><tr className="border-b"><th className="p-6">User</th><th className="p-6">Role</th><th className="p-6 text-right">Aksi</th></tr></thead>
-                    <tbody>{allUsers.map(u => (<tr key={u.username} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors"><td className="p-6"><div><p className="font-bold text-slate-800">{u.name}</p><p className="text-xs text-slate-400">@{u.username}</p></div></td><td className="p-6"><span className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase ${u.role === 'superadmin' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>{u.role}</span></td><td className="p-6 text-right">{u.username !== 'superadmin' && <button onClick={() => handleDeleteUser(u.username)} className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg></button>}</td></tr>))}</tbody>
+                    <thead className="bg-slate-50 dark:bg-slate-950 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      <tr className="border-b dark:border-slate-800">
+                        <th className="p-6">User</th>
+                        <th className="p-6">Role</th>
+                        <th className="p-6">Password</th>
+                        <th className="p-6 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {allUsers.map(u => (
+                        <tr key={u.username} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                          <td className="p-6">
+                            <div>
+                              <p className="font-bold text-slate-800 dark:text-white">{u.name}</p>
+                              <p className="text-xs text-slate-400">@{u.username}</p>
+                            </div>
+                          </td>
+                          <td className="p-6">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                              u.role === 'superadmin' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300' :
+                              u.role === 'engineer' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' :
+                              u.role === 'commercial' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300' :
+                              u.role === 'finance' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300' :
+                              'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                            }`}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td className="p-6">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-slate-700 dark:text-slate-300 font-bold bg-slate-100 dark:bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-200/50 dark:border-slate-700/50 min-w-[90px] text-center inline-block">
+                                {showPasswordMap[u.username] ? (u.password || '(tanpa pw)') : '••••••••'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => toggleShowPassword(u.username)}
+                                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 rounded-lg transition-colors"
+                                title={showPasswordMap[u.username] ? 'Sembunyikan Password' : 'Lihat Password'}
+                              >
+                                {showPasswordMap[u.username] ? (
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                ) : (
+                                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                )}
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-6 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button onClick={() => handleOpenEditUser(u)} title="Edit User & Role" className="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded-lg transition-colors">
+                                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                              {u.username !== 'superadmin' && (
+                                <button onClick={() => handleDeleteUser(u.username)} title="Hapus User" className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/40 rounded-lg transition-colors">
+                                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
                   </table>
                 </div>
              </div>
@@ -564,6 +715,68 @@ const App: React.FC = () => {
             setIsDayPickerOpen(false);
           }
       }} onQuickUpdateStatus={() => {}} />
+      {isEditUserModalOpen && editingUser && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in">
+            <form onSubmit={handleSaveEditUser}>
+              <div className="p-8 pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                <div>
+                  <h3 className="text-xl font-black text-slate-800 dark:text-white tracking-widest uppercase">Edit User & Role</h3>
+                  <p className="text-xs text-slate-400">@{editingUser.username}</p>
+                </div>
+                <button type="button" onClick={() => setIsEditUserModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Nama Lengkap</label>
+                  <input required type="text" value={editingUser.name} onChange={e => setEditingUser({...editingUser, name: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Role Aksen & Hak Akses</label>
+                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value})} className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white">
+                    <option value="user">User / Standard</option>
+                    <option value="engineer">Engineer</option>
+                    <option value="commercial">Commercial / Sales</option>
+                    <option value="finance">Finance / Admin</option>
+                    <option value="superadmin">Superadmin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Password User</label>
+                  <div className="relative">
+                    <input
+                      type={showModalPassword ? 'text' : 'password'}
+                      placeholder="Ubah password user..."
+                      value={editingUser.password}
+                      onChange={e => setEditingUser({...editingUser, password: e.target.value})}
+                      className="w-full p-4 pr-12 bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowModalPassword(!showModalPassword)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-600 transition-colors p-1"
+                      title={showModalPassword ? 'Sembunyikan Password' : 'Tampilkan Password'}
+                    >
+                      {showModalPassword ? (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                      ) : (
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="p-8 pt-0 flex gap-3">
+                <button type="button" onClick={() => setIsEditUserModalOpen(false)} className="w-1/3 py-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold rounded-2xl transition-all">Batal</button>
+                <button type="submit" className="w-2/3 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Simpan Perubahan</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </div>
   );

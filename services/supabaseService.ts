@@ -50,13 +50,27 @@ export const supabaseService = {
   async getUsers() {
     const { data } = await supabase
       .from('profiles')
-      .select('username, role, name')
+      .select('username, role, name, password')
       .order('name', { ascending: true });
     return data || [];
   },
 
   async addUser(userData) {
     return await supabase.from('profiles').insert([userData]);
+  },
+
+  async updateUser(username: string, updates: { name?: string; password?: string; role?: string }) {
+    const cleanUpdates: any = {};
+    if (updates.name) cleanUpdates.name = updates.name;
+    if (updates.role) cleanUpdates.role = updates.role;
+    if (updates.password && updates.password.trim() !== '') cleanUpdates.password = updates.password;
+
+    const { error } = await supabase
+      .from('profiles')
+      .update(cleanUpdates)
+      .eq('username', username);
+    if (error) throw error;
+    return { success: true };
   },
 
   async deleteUser(username) {
@@ -296,5 +310,210 @@ export const supabaseService = {
       share_expires_at: data.share_expires_at,
       created_at: data.created_at
     };
+  },
+
+  // --- Manajemen Project Knowledge Database ---
+  async getProjects(): Promise<Project[]> {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        return data.map((p: any) => ({
+          id: p.id,
+          code: p.code,
+          title: p.title,
+          clientName: p.client_name,
+          location: p.location,
+          status: p.status,
+          leadEngineer: p.lead_engineer,
+          startDate: p.start_date,
+          completionDate: p.completion_date,
+          description: p.description,
+          files: p.files || { engineering: [], commercial: [], finance: [], documentation: [] },
+          notes: p.notes || [],
+          created_at: p.created_at
+        }));
+      }
+    } catch (e) {
+      console.log('Supabase project table query fallback to local storage');
+    }
+
+    // Fallback LocalStorage Sync
+    const local = localStorage.getItem('mypanca_projects_db');
+    if (local) {
+      try {
+        return JSON.parse(local);
+      } catch (err) {
+        console.error('Failed to parse local projects:', err);
+      }
+    }
+
+    // Sample Default Projects PT Panca
+    const defaultProjects: Project[] = [
+      {
+        id: 'proj_001',
+        code: 'PRJ-2026-001',
+        title: 'Instalasi Sensor Gempa & Automation System',
+        clientName: 'BMKG / Stasiun Geofisika Jakarta',
+        location: 'Jakarta Pusat',
+        status: 'Selesai',
+        leadEngineer: 'Arie (Senior Engineer)',
+        startDate: '2026-01-10',
+        description: 'Pemasangan sensor pemicu relai gempa bumi otomatis, wiring panel shutdown darurat & kalibrasi threshold.',
+        files: {
+          engineering: [
+            {
+              id: 'f1',
+              name: 'SLD_Sensor_Wiring_V1.pdf',
+              url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+              fileType: 'pdf',
+              uploadedBy: 'Arie',
+              uploadedAt: '2026-01-15T00:00:00Z',
+              notes: 'Single Line Diagram Wiring Panel & Relay Output'
+            },
+            {
+              id: 'f2',
+              name: 'Manual_Setting_Threshold_Sensor.pdf',
+              url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
+              fileType: 'pdf',
+              uploadedBy: 'Evan',
+              uploadedAt: '2026-01-18T00:00:00Z',
+              notes: 'Panduan konfigurasi sensitivitas sensor Mgal'
+            }
+          ],
+          commercial: [
+            {
+              id: 'f3',
+              name: 'RAB_Final_Sensor_Gempa_BMKG.xlsx',
+              url: '#',
+              fileType: 'xlsx',
+              uploadedBy: 'Commercial Team',
+              uploadedAt: '2026-01-08T00:00:00Z',
+              notes: 'Rincian HPP, Margin & Budgeting'
+            }
+          ],
+          finance: [
+            {
+              id: 'f4',
+              name: 'BAST_Pembayaran_100.pdf',
+              url: '#',
+              fileType: 'pdf',
+              uploadedBy: 'Finance Team',
+              uploadedAt: '2026-01-25T00:00:00Z',
+              notes: 'Invoice Lunas & BAST Pekerjaan Selesai'
+            }
+          ],
+          documentation: [
+            {
+              id: 'f5',
+              name: 'Foto_Pemasangan_Panel_Sensor.img',
+              url: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
+              fileType: 'img',
+              uploadedBy: 'Jeremy',
+              uploadedAt: '2026-01-20T00:00:00Z',
+              notes: 'Foto dokumentasi hasil kelistrikan akhir'
+            }
+          ]
+        },
+        notes: [
+          {
+            id: 'n1',
+            title: 'SOP Kalibrasi Sensitivitas Sensor Gempa',
+            category: 'Testing & Commissioning',
+            content: '1. Pastikan ground terpasang kuat < 1 Ohm.\n2. Lakukan zeroing level pada accelerometer.\n3. Atur threshold tripping pada 50 Mgal agar tidak terpicu oleh getaran kendaraan berat di sekitar lokasi.',
+            author: 'Arie',
+            createdAt: '2026-01-22T00:00:00Z'
+          },
+          {
+            id: 'n2',
+            title: 'Troubleshooting Induksi Noise Sinyal',
+            category: 'Kendala & Solusi',
+            content: 'Kendala: Sensor sempat membaca false-alarm saat motor BAST berjalan.\nSolusi: Memindahkan kabel sinyal ke jalur tray terpisah dan menggunakan kabel STP (Shielded Twisted Pair) dengan grounding satu titik.',
+            author: 'Evan',
+            createdAt: '2026-01-23T00:00:00Z'
+          }
+        ]
+      },
+      {
+        id: 'proj_002',
+        code: 'PRJ-2026-002',
+        title: 'Sistem Automasi EWS Early Warning Gempa',
+        clientName: 'PT Smelter Utama',
+        location: 'Site Gresik, Jawa Timur',
+        status: 'Sedang Berjalan',
+        leadEngineer: 'Evan',
+        startDate: '2026-02-01',
+        description: 'Integrasi sistem peringatan dini gempa bumi ke sirine utama pabrik & autoshutdown gas solenoid valve.',
+        files: {
+          engineering: [
+            {
+              id: 'f6',
+              name: 'Drawing_EWS_Smelter.dwg',
+              url: '#',
+              fileType: 'dwg',
+              uploadedBy: 'Evan',
+              uploadedAt: '2026-02-05T00:00:00Z',
+              notes: 'Layout wiring solenoid valve'
+            }
+          ],
+          commercial: [],
+          finance: [],
+          documentation: []
+        },
+        notes: [
+          {
+            id: 'n3',
+            title: 'Integrasi Sirine & Interlock Gas Valve',
+            category: 'Konfigurasi Sistem',
+            content: 'Relay 1 dihubungkan ke PLC Utama Pabrik untuk membunyikan sirine evacuation. Relay 2 memutus arus solenoid valve saluran gas.',
+            author: 'Evan',
+            createdAt: '2026-02-08T00:00:00Z'
+          }
+        ]
+      }
+    ];
+
+    localStorage.setItem('mypanca_projects_db', JSON.stringify(defaultProjects));
+    return defaultProjects;
+  },
+
+  async saveProject(project: Project): Promise<Project[]> {
+    const currentProjects = await this.getProjects();
+    const existingIndex = currentProjects.findIndex(p => p.id === project.id);
+    
+    let updatedList: Project[];
+    if (existingIndex >= 0) {
+      updatedList = [...currentProjects];
+      updatedList[existingIndex] = project;
+    } else {
+      updatedList = [project, ...currentProjects];
+    }
+
+    localStorage.setItem('mypanca_projects_db', JSON.stringify(updatedList));
+
+    try {
+      await supabase.from('projects').upsert({
+        id: project.id,
+        code: project.code,
+        title: project.title,
+        client_name: project.clientName,
+        location: project.location,
+        status: project.status,
+        lead_engineer: project.leadEngineer,
+        start_date: project.startDate,
+        completion_date: project.completionDate,
+        description: project.description,
+        files: project.files,
+        notes: project.notes,
+        updated_at: new Date().toISOString()
+      });
+    } catch (e) {
+      console.log('Supabase project save fallback to local storage');
+    }
+
+    return updatedList;
   }
 };
