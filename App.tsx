@@ -16,6 +16,7 @@ import { DriveView } from './components/DriveView';
 import { SharedPostView } from './components/SharedPostView';
 import { ProjectView } from './components/ProjectView';
 import { QAView } from './components/QAView';
+import TimelineListView from './components/TimelineListView';
 
 interface UserSession {
   username: string;
@@ -35,11 +36,33 @@ interface Notification {
 }
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
+  const [currentUser, setCurrentUser] = useState<UserSession | null>(() => {
+    try {
+      const saved = localStorage.getItem('mypanca_session');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.username && parsed.role) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.error('Gagal memuat sesi tersimpan:', e);
+    }
+    return null;
+  });
+
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [shareDriveToken, setShareDriveToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('mypanca_session', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('mypanca_session');
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -55,7 +78,7 @@ const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive' | 'project' | 'qa'>('analytics'); 
   const [assignSubView, setAssignSubView] = useState<CalendarViewType>('month');
-  const [trackingViewMode, setTrackingViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [trackingViewMode, setTrackingViewMode] = useState<'calendar' | 'list' | 'timeline'>('calendar');
   const [trackingCalendarSubView, setTrackingCalendarSubView] = useState<CalendarViewType>('month');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
@@ -80,6 +103,11 @@ const App: React.FC = () => {
   const [targetUserTasks, setTargetUserTasks] = useState<Task[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   
+  const [taskViewMode, setTaskViewMode] = useState<'list' | 'calendar' | 'timeline'>('list');
+  const [taskCalendarSubView, setTaskCalendarSubView] = useState<CalendarViewType>('month');
+  const [isAddTaskMenuOpen, setIsAddTaskMenuOpen] = useState(false);
+  const [isContinueTaskModalOpen, setIsContinueTaskModalOpen] = useState(false);
+
   const [stickyNote, setStickyNote] = useState('');
   const [isNoteOpen, setIsNoteOpen] = useState(false);
 
@@ -510,10 +538,10 @@ const App: React.FC = () => {
   const getViewLabel = (v: string) => {
     switch (v) {
       case 'analytics': return 'Dashboard';
-      case 'list': return 'Tugas';
+      case 'list':
       case 'month':
       case 'week':
-      case 'day': return 'Kalender';
+      case 'day': return 'Tugas';
       case 'drive': return 'Drive';
       case 'project': return 'Project Database';
       case 'qa': return 'Q&A Forum';
@@ -570,18 +598,10 @@ const App: React.FC = () => {
 
                     <button
                       onClick={() => { setView('list'); setIsMenuDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'list' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${['list', 'month', 'week', 'day'].includes(view) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
                       <span>Tugas</span>
-                    </button>
-
-                    <button
-                      onClick={() => { setView('month'); setIsMenuDropdownOpen(false); }}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${['month', 'week', 'day'].includes(view) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                    >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                      <span>Kalender</span>
                     </button>
 
                     <button
@@ -705,7 +725,11 @@ const App: React.FC = () => {
                     </div>
 
                     <button
-                      onClick={() => { setCurrentUser(null); setIsUserDropdownOpen(false); }}
+                      onClick={() => { 
+                        localStorage.removeItem('mypanca_session');
+                        setCurrentUser(null); 
+                        setIsUserDropdownOpen(false); 
+                      }}
                       className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-all"
                     >
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -932,11 +956,11 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
-                    {/* View Mode Toggle (Calendar vs List) */}
+                    {/* View Mode Toggle (Calendar vs Timeline vs List) */}
                     <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
                       <button
                         onClick={() => setTrackingViewMode('calendar')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${
                           trackingViewMode === 'calendar' 
                             ? 'bg-indigo-600 text-white shadow-md' 
                             : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
@@ -946,8 +970,19 @@ const App: React.FC = () => {
                         Kalender
                       </button>
                       <button
+                        onClick={() => setTrackingViewMode('timeline')}
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${
+                          trackingViewMode === 'timeline' 
+                            ? 'bg-indigo-600 text-white shadow-md' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        Timeline List
+                      </button>
+                      <button
                         onClick={() => setTrackingViewMode('list')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                        className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all ${
                           trackingViewMode === 'list' 
                             ? 'bg-indigo-600 text-white shadow-md' 
                             : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
@@ -1000,6 +1035,15 @@ const App: React.FC = () => {
                           )}
                         </div>
                       </div>
+                    ) : trackingViewMode === 'timeline' ? (
+                      <div className="animate-fade-in">
+                        <TimelineListView 
+                          tasks={targetUserTasks} 
+                          onTaskClick={(t, lIdx) => handleOpenTask(t, typeof lIdx === 'number' && lIdx >= 0 ? lIdx : (t.logs ? t.logs.length - 1 : -1))}
+                          onDeleteTask={handleDeleteTask}
+                          showTrackingDetails={true}
+                        />
+                      </div>
                     ) : (
                       <div className="animate-fade-in">
                         <ListView 
@@ -1023,15 +1067,173 @@ const App: React.FC = () => {
              </div>
            )}
 
-           {['month', 'week', 'day'].includes(view) && (
-             <div className="px-6 lg:px-10 pt-8 pb-4"><CalendarHeader currentDate={currentDate} view={view as CalendarViewType} setView={setView} onPrev={() => changeDate(-1)} onNext={() => changeDate(1)} onToday={() => setCurrentDate(new Date())} /></div>
+           {['list', 'month', 'week', 'day'].includes(view) && (
+             <div className="px-6 lg:px-10 pt-6 pb-2 space-y-4">
+               {/* Live Current Date Banner & Top Controls */}
+               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs">
+                 {/* Live Date Display */}
+                 <div className="flex items-center gap-3">
+                   <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 border border-blue-100 dark:border-blue-900/50">
+                     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                   </div>
+                   <div>
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Tanggal Terkini</span>
+                     <h3 className="text-sm font-black text-slate-800 dark:text-white capitalize">
+                       {new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                     </h3>
+                   </div>
+                 </div>
+
+                 {/* View Mode Toggle & Blue Add Task Button */}
+                 <div className="flex flex-wrap items-center gap-3">
+                   {/* Toggle List vs Kalender */}
+                   <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                     <button
+                       onClick={() => { setTaskViewMode('list'); setView('list'); }}
+                       className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                         taskViewMode === 'list' && view === 'list'
+                           ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                       }`}
+                     >
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+                       <span>Tipe List</span>
+                     </button>
+                     <button
+                       onClick={() => { setTaskViewMode('timeline'); setView('list'); }}
+                       className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                         taskViewMode === 'timeline' && view === 'list'
+                           ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                       }`}
+                     >
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                       <span>Tipe Timeline List</span>
+                     </button>
+                     <button
+                       onClick={() => { setTaskViewMode('calendar'); setView(taskCalendarSubView); }}
+                       className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                         taskViewMode === 'calendar' || ['month', 'week', 'day'].includes(view)
+                           ? 'bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs'
+                           : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                       }`}
+                     >
+                       <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                       <span>Tipe Kalender</span>
+                     </button>
+                   </div>
+
+                   {/* Blue Add Task Button with 2 Options Dropdown */}
+                   <div className="relative">
+                     <button
+                       onClick={() => setIsAddTaskMenuOpen(!isAddTaskMenuOpen)}
+                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center gap-2"
+                     >
+                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 5v14M5 12h14"/></svg>
+                       <span>Tambah Tugas</span>
+                       <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isAddTaskMenuOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                     </button>
+
+                     {/* Dropdown Options */}
+                     {isAddTaskMenuOpen && (
+                       <>
+                         <div className="fixed inset-0 z-[190]" onClick={() => setIsAddTaskMenuOpen(false)} />
+                         <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 z-[200] animate-fade-in space-y-1">
+                           <button
+                             onClick={() => {
+                               setIsAddTaskMenuOpen(false);
+                               setSelectedTask(null);
+                               setSelectedLogIndex(-1);
+                               setIsModalOpen(true);
+                             }}
+                             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-blue-50 dark:hover:bg-blue-950/50 hover:text-blue-600 transition-all text-left"
+                           >
+                             <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0">
+                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                             </div>
+                             <div>
+                               <div className="font-bold">Buat Tugas Baru</div>
+                               <div className="text-[10px] text-slate-400 font-normal">Mulai dari tugas kosong baru</div>
+                             </div>
+                           </button>
+
+                           <button
+                             onClick={() => {
+                               setIsAddTaskMenuOpen(false);
+                               setIsContinueTaskModalOpen(true);
+                             }}
+                             className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 hover:text-indigo-600 transition-all text-left"
+                           >
+                             <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 flex items-center justify-center shrink-0">
+                               <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                             </div>
+                             <div>
+                               <div className="font-bold">Lanjutkan Tugas</div>
+                               <div className="text-[10px] text-slate-400 font-normal">Pilih tugas yang belum selesai</div>
+                             </div>
+                           </button>
+                         </div>
+                       </>
+                     )}
+                   </div>
+                 </div>
+               </div>
+
+               {/* Calendar Navigation Header if in Calendar Mode */}
+               {(taskViewMode === 'calendar' || ['month', 'week', 'day'].includes(view)) && (
+                 <CalendarHeader 
+                   currentDate={currentDate} 
+                   view={(['month', 'week', 'day'].includes(view) ? view : taskCalendarSubView) as CalendarViewType} 
+                   setView={(v) => { setTaskCalendarSubView(v as CalendarViewType); setView(v); }} 
+                   onPrev={() => changeDate(-1)} 
+                   onNext={() => changeDate(1)} 
+                   onToday={() => setCurrentDate(new Date())} 
+                 />
+               )}
+             </div>
            )}
 
            <div className="flex-1 p-6 lg:p-10 overflow-y-auto no-scrollbar">
-              {view === 'month' && <MonthView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
-              {view === 'week' && <WeekView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
-              {view === 'day' && <DayView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
-              {view === 'list' && <ListView tasks={tasks} onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} onDeleteTask={handleDeleteTask} onColorChange={() => {}} onAddNew={() => { setSelectedTask(null); setSelectedLogIndex(-1); setIsModalOpen(true); }} />}
+              {(taskViewMode === 'calendar' || ['month', 'week', 'day'].includes(view)) ? (
+                <>
+                  {view === 'month' && <MonthView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                  {view === 'week' && <WeekView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                  {view === 'day' && <DayView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
+                </>
+              ) : taskViewMode === 'timeline' && view === 'list' ? (
+                <TimelineListView 
+                  tasks={tasks} 
+                  onTaskClick={(t, lIdx) => handleOpenTask(t, typeof lIdx === 'number' && lIdx >= 0 ? lIdx : (t.logs ? t.logs.length - 1 : -1))} 
+                  onDeleteTask={handleDeleteTask} 
+                  onAddNew={() => setIsAddTaskMenuOpen(true)}
+                  onAddNewChoice={(choice) => {
+                    if (choice === 'new') {
+                      setSelectedTask(null);
+                      setSelectedLogIndex(-1);
+                      setIsModalOpen(true);
+                    } else {
+                      setIsContinueTaskModalOpen(true);
+                    }
+                  }}
+                />
+              ) : view === 'list' ? (
+                <ListView 
+                  tasks={tasks} 
+                  onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} 
+                  onDeleteTask={handleDeleteTask} 
+                  onColorChange={() => {}} 
+                  onAddNew={() => setIsAddTaskMenuOpen(true)}
+                  onAddNewChoice={(choice) => {
+                    if (choice === 'new') {
+                      setSelectedTask(null);
+                      setSelectedLogIndex(-1);
+                      setIsModalOpen(true);
+                    } else {
+                      setIsContinueTaskModalOpen(true);
+                    }
+                  }}
+                />
+              ) : null}
               {view === 'analytics' && <AnalyticsView tasks={tasks} />}
            </div>
         </section>
@@ -1114,6 +1316,105 @@ const App: React.FC = () => {
                 <button type="submit" className="w-2/3 py-4 bg-indigo-600 text-white font-black rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Simpan Perubahan</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lanjutkan Tugas */}
+      {isContinueTaskModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in flex flex-col max-h-[85vh]">
+            <div className="p-6 pb-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-950/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-black">
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800 dark:text-white uppercase tracking-wider">Lanjutkan Tugas Belum Selesai</h3>
+                  <p className="text-xs text-slate-400">Pilih tugas yang ingin dilanjutkan hari ini</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsContinueTaskModalOpen(false)} 
+                className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors rounded-xl"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-3 flex-1">
+              {tasks.filter(t => t.status !== 'Selesai').length > 0 ? (
+                tasks.filter(t => t.status !== 'Selesai').map(task => (
+                  <div
+                    key={task.id}
+                    className="p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 hover:border-blue-300 dark:hover:border-blue-700 hover:bg-white dark:hover:bg-slate-900 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate">{task.companyName}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${
+                          task.status === 'Proses' ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' :
+                          task.status === 'Ulang' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' :
+                          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                        }`}>
+                          {task.status || 'Belum Selesai'}
+                        </span>
+                      </div>
+                      <h4 className="text-sm font-bold text-slate-800 dark:text-white truncate group-hover:text-blue-600 transition-colors">{task.title}</h4>
+                    </div>
+
+                    <button
+                      onClick={async () => {
+                        setIsContinueTaskModalOpen(false);
+                        const todayIso = new Date().toISOString();
+                        const lastLog = task.logs && task.logs.length > 0 ? task.logs[task.logs.length - 1] : null;
+                        const newLogIndex = task.logs ? task.logs.length : 0;
+                        
+                        const updatedTaskToEdit: Task = {
+                          ...task,
+                          endDate: todayIso,
+                          status: 'Proses' as any,
+                          logs: [
+                            ...(task.logs || []),
+                            {
+                              status: 'Proses' as any,
+                              progress: task.progress !== undefined ? task.progress : (lastLog?.progress || 50),
+                              date: todayIso,
+                              description: 'Dilanjutkan pada: ' + new Date().toLocaleString('id-ID', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })
+                            }
+                          ]
+                        };
+
+                        // Otomatis simpan data terbaru termasuk di kalender dengan waktu terkini
+                        await handleSaveTask(updatedTaskToEdit);
+
+                        setSelectedTask(updatedTaskToEdit);
+                        setSelectedLogIndex(newLogIndex);
+                        setIsModalOpen(true);
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-500/20 active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
+                    >
+                      <span>Lanjutkan</span>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="py-12 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mb-3">
+                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                  </div>
+                  <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Semua tugas telah selesai!</p>
+                  <p className="text-xs text-slate-400 mt-1">Tidak ada tugas tertunda yang perlu dilanjutkan.</p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

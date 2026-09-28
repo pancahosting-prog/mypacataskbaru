@@ -587,8 +587,17 @@ export const supabaseService = {
           return timeB - timeA;
         });
 
-        localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
-        return questions;
+        // Deduplicate questions by ID
+        const uniqueMap = new Map<string, QAQuestion>();
+        for (const q of questions) {
+          if (!uniqueMap.has(q.id)) {
+            uniqueMap.set(q.id, q);
+          }
+        }
+        const deduplicated = Array.from(uniqueMap.values());
+
+        localStorage.setItem('mypanca_qa_questions', JSON.stringify(deduplicated));
+        return deduplicated;
       }
     } catch (e) {
       console.log('Supabase QA query fallback to local storage', e);
@@ -598,7 +607,15 @@ export const supabaseService = {
     if (local) {
       try {
         const parsed = JSON.parse(local);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const uniqueMap = new Map<string, QAQuestion>();
+          for (const q of parsed) {
+            if (!uniqueMap.has(q.id)) {
+              uniqueMap.set(q.id, q);
+            }
+          }
+          return Array.from(uniqueMap.values());
+        }
       } catch (err) {
         console.error('Failed to parse local QA questions:', err);
       }
@@ -638,11 +655,28 @@ export const supabaseService = {
 
   async createQAQuestion(question: QAQuestion): Promise<QAQuestion[]> {
     const questions = await this.getQAQuestions();
-    const updated = [question, ...questions];
-    localStorage.setItem('mypanca_qa_questions', JSON.stringify(updated));
+    const existingIndex = questions.findIndex(q => q.id === question.id);
+    
+    let updated: QAQuestion[];
+    if (existingIndex >= 0) {
+      updated = [...questions];
+      updated[existingIndex] = question;
+    } else {
+      updated = [question, ...questions];
+    }
+
+    // Deduplicate strictly by ID
+    const uniqueMap = new Map<string, QAQuestion>();
+    for (const q of updated) {
+      if (!uniqueMap.has(q.id)) {
+        uniqueMap.set(q.id, q);
+      }
+    }
+    const finalUpdated = Array.from(uniqueMap.values());
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(finalUpdated));
 
     try {
-      const { error } = await supabase.from('qa_questions').insert([{
+      const { error } = await supabase.from('qa_questions').upsert([{
         id: question.id,
         title: question.title,
         content: question.content,
@@ -658,7 +692,7 @@ export const supabaseService = {
       console.log('Supabase createQAQuestion fallback to local storage', e);
     }
 
-    return updated;
+    return finalUpdated;
   },
 
   async createQAAnswer(answer: QAAnswer): Promise<QAQuestion[]> {

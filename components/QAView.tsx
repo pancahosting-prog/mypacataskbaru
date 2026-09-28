@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { QAQuestion, QAAnswer, QAAttachment } from '../types';
 import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
@@ -49,6 +49,7 @@ export const QAView: React.FC<QAViewProps> = ({
   const [askAttachments, setAskAttachments] = useState<QAAttachment[]>([]);
   const [isUploadingAskFile, setIsUploadingAskFile] = useState(false);
   const [askUploadError, setAskUploadError] = useState('');
+  const [isSubmittingQuestion, setIsSubmittingQuestion] = useState(false);
 
   // Edit Question Form State
   const [editTitle, setEditTitle] = useState('');
@@ -204,29 +205,47 @@ export const QAView: React.FC<QAViewProps> = ({
   };
 
   // Handlers for Question
-  const handleCreateQuestion = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newTitle.trim() || !newContent.trim()) return;
-
-    const questionItem: QAQuestion = {
-      id: `qa_${Date.now()}`,
-      title: newTitle.trim(),
-      category: newCategory,
-      content: newContent.trim(),
-      attachments: askAttachments,
-      author_username: currentUser.username,
-      author_name: currentUser.name,
-      author_role: currentUser.role,
-      created_at: new Date().toISOString(),
-      answers: [],
-      latest_answer_at: new Date().toISOString()
-    };
-
-    await onCreateQuestion(questionItem);
-    setIsAskModalOpen(false);
+  const handleOpenAskModal = () => {
     setNewTitle('');
+    setNewCategory('Sensor & Automation');
     setNewContent('');
     setAskAttachments([]);
+    setAskUploadError('');
+    setIsAskModalOpen(true);
+  };
+
+  const handleCreateQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim() || isSubmittingQuestion) return;
+
+    setIsSubmittingQuestion(true);
+    try {
+      const questionItem: QAQuestion = {
+        id: `qa_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        title: newTitle.trim(),
+        category: newCategory,
+        content: newContent.trim(),
+        attachments: askAttachments,
+        author_username: currentUser.username,
+        author_name: currentUser.name,
+        author_role: currentUser.role,
+        created_at: new Date().toISOString(),
+        answers: [],
+        latest_answer_at: new Date().toISOString()
+      };
+
+      await onCreateQuestion(questionItem);
+      setNewTitle('');
+      setNewContent('');
+      setAskAttachments([]);
+      setAskUploadError('');
+      setIsAskModalOpen(false);
+    } catch (err: any) {
+      console.error('Gagal membuat pertanyaan:', err);
+      setAskUploadError(err.message || 'Gagal menyimpan pertanyaan. Silakan coba lagi.');
+    } finally {
+      setIsSubmittingQuestion(false);
+    }
   };
 
   const handleOpenEditQuestion = (q: QAQuestion) => {
@@ -314,7 +333,18 @@ export const QAView: React.FC<QAViewProps> = ({
     'General / Umum'
   ];
 
-  const filteredQuestions = questions.filter(q => {
+  // Strictly deduplicate questions by ID to guarantee no duplicates
+  const uniqueQuestions = useMemo(() => {
+    const map = new Map<string, QAQuestion>();
+    for (const q of questions) {
+      if (!map.has(q.id)) {
+        map.set(q.id, q);
+      }
+    }
+    return Array.from(map.values());
+  }, [questions]);
+
+  const filteredQuestions = uniqueQuestions.filter(q => {
     const matchesSearch =
       q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -356,7 +386,7 @@ export const QAView: React.FC<QAViewProps> = ({
           </p>
         </div>
         <button
-          onClick={() => setIsAskModalOpen(true)}
+          onClick={handleOpenAskModal}
           className="z-10 px-6 py-3.5 sm:px-8 sm:py-4 bg-indigo-500 hover:bg-indigo-400 text-white font-black rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-2.5 shrink-0 text-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
@@ -812,10 +842,17 @@ export const QAView: React.FC<QAViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isUploadingAskFile}
-                  className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                  disabled={isUploadingAskFile || isSubmittingQuestion}
+                  className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  Kirim Pertanyaan
+                  {isSubmittingQuestion ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Kirim Pertanyaan</span>
+                  )}
                 </button>
               </div>
             </form>
