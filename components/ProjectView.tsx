@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Project, ProjectFile, ProjectNote, ProjectFolderCategory } from '../types';
-import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
 interface ProjectViewProps {
   currentUser: {
@@ -1236,6 +1236,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                 <img
                   src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
+                  onError={(e) => handleImageError(e, previewFile.url)}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
               </div>

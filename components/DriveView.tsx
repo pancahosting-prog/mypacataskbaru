@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrivePost, DriveAttachment } from '../types';
 import { supabaseService } from '../services/supabaseService';
-import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
 interface DriveViewProps {
   currentUser: {
@@ -711,6 +711,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                                   <img
                                     src={getProxiedUrl(file.url)}
                                     alt={file.name}
+                                    onError={(e) => handleImageError(e, file.url)}
                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     loading="lazy"
                                   />
@@ -905,6 +906,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                 <img
                   src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
+                  onError={(e) => handleImageError(e, previewFile.url)}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
               </div>

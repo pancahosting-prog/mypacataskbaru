@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QAQuestion, QAAnswer, QAAttachment } from '../types';
-import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
 interface QAViewProps {
   currentUser: {
@@ -488,6 +488,7 @@ export const QAView: React.FC<QAViewProps> = ({
                           <img
                             src={getProxiedUrl(att.url)}
                             alt={att.name}
+                            onError={(e) => handleImageError(e, att.url)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             loading="lazy"
                           />
@@ -566,6 +567,7 @@ export const QAView: React.FC<QAViewProps> = ({
                               <img
                                 src={getProxiedUrl(att.url)}
                                 alt={att.name}
+                                onError={(e) => handleImageError(e, att.url)}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                 loading="lazy"
                               />
@@ -642,6 +644,7 @@ export const QAView: React.FC<QAViewProps> = ({
                                     <img
                                       src={getProxiedUrl(att.url)}
                                       alt={att.name}
+                                      onError={(e) => handleImageError(e, att.url)}
                                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                       loading="lazy"
                                     />
@@ -1160,6 +1163,7 @@ export const QAView: React.FC<QAViewProps> = ({
                 <img
                   src={getProxiedUrl(previewAttachment.url)}
                   alt={previewAttachment.name}
+                  onError={(e) => handleImageError(e, previewAttachment.url)}
                   className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
                 />
               ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
