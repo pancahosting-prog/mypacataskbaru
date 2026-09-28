@@ -222,6 +222,43 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateQAQuestion = async (q: QAQuestion) => {
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.updateQAQuestion(q);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Update QA question failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleUpdateQAAnswer = async (ans: QAAnswer) => {
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.updateQAAnswer(ans);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Update QA answer failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteQAAnswer = async (ansId: string, qId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus jawaban ini?')) return;
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.deleteQAAnswer(ansId, qId);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Delete QA answer failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const handleDeleteQAQuestion = async (qId: string) => {
     if (!confirm('Apakah Anda yakin ingin menghapus pertanyaan ini?')) return;
     setIsSyncing(true);
@@ -616,8 +653,11 @@ const App: React.FC = () => {
                currentUser={currentUser}
                questions={qaQuestions}
                onCreateQuestion={handleCreateQAQuestion}
+               onUpdateQuestion={handleUpdateQAQuestion}
                onCreateAnswer={handleCreateQAAnswer}
+               onUpdateAnswer={handleUpdateQAAnswer}
                onDeleteQuestion={handleDeleteQAQuestion}
+               onDeleteAnswer={handleDeleteQAAnswer}
              />
            )}
 

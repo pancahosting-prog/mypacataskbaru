@@ -697,6 +697,90 @@ export const supabaseService = {
     return questions;
   },
 
+  async updateQAQuestion(question: QAQuestion): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const index = questions.findIndex(q => q.id === question.id);
+    if (index >= 0) {
+      questions[index] = { ...questions[index], ...question };
+    }
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
+
+    try {
+      const { error } = await supabase.from('qa_questions').upsert([{
+        id: question.id,
+        title: question.title,
+        content: question.content,
+        category: question.category,
+        attachments: question.attachments,
+        author_username: question.author_username,
+        author_name: question.author_name,
+        author_role: question.author_role,
+        created_at: question.created_at
+      }]);
+      if (error) console.warn('Supabase updateQAQuestion table error:', error.message);
+    } catch (e) {
+      console.log('Supabase updateQAQuestion fallback to local storage', e);
+    }
+
+    return questions;
+  },
+
+  async updateQAAnswer(answer: QAAnswer): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const qIndex = questions.findIndex(q => q.id === answer.question_id);
+
+    if (qIndex >= 0) {
+      const q = questions[qIndex];
+      const ansIndex = (q.answers || []).findIndex(a => a.id === answer.id);
+      if (ansIndex >= 0) {
+        q.answers[ansIndex] = { ...q.answers[ansIndex], ...answer };
+        questions[qIndex] = { ...q };
+      }
+    }
+
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
+
+    try {
+      const { error } = await supabase.from('qa_answers').upsert([{
+        id: answer.id,
+        question_id: answer.question_id,
+        content: answer.content,
+        attachments: answer.attachments,
+        author_username: answer.author_username,
+        author_name: answer.author_name,
+        author_role: answer.author_role,
+        created_at: answer.created_at
+      }]);
+      if (error) console.warn('Supabase updateQAAnswer table error:', error.message);
+    } catch (e) {
+      console.log('Supabase updateQAAnswer fallback to local storage', e);
+    }
+
+    return questions;
+  },
+
+  async deleteQAAnswer(answerId: string, questionId: string): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const qIndex = questions.findIndex(q => q.id === questionId);
+
+    if (qIndex >= 0) {
+      const q = questions[qIndex];
+      q.answers = (q.answers || []).filter(a => a.id !== answerId);
+      q.latest_answer_at = q.answers.length > 0 ? q.answers[0].created_at : q.created_at;
+      questions[qIndex] = { ...q };
+    }
+
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
+
+    try {
+      await supabase.from('qa_answers').delete().eq('id', answerId);
+    } catch (e) {
+      console.log('Supabase deleteQAAnswer fallback to local storage', e);
+    }
+
+    return questions;
+  },
+
   async deleteQAQuestion(questionId: string): Promise<QAQuestion[]> {
     const questions = await this.getQAQuestions();
     const updated = questions.filter(q => q.id !== questionId);
@@ -712,3 +796,4 @@ export const supabaseService = {
     return updated;
   }
 };
+

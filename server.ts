@@ -18,13 +18,17 @@ async function startServer() {
   app.get('/api/proxy-file', async (req, res) => {
     try {
       const fileUrl = req.query.url as string;
+      const download = req.query.download === 'true';
+      const filename = req.query.filename as string;
+
       if (!fileUrl || (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://'))) {
         return res.status(400).send('Invalid file URL');
       }
 
       const response = await fetch(fileUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': '*/*'
         }
       });
 
@@ -39,6 +43,21 @@ async function startServer() {
       if (contentLength) res.setHeader('Content-Length', contentLength);
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', '*');
+
+      if (download || filename) {
+        let safeName = filename;
+        if (!safeName) {
+          try {
+            const urlObj = new URL(fileUrl);
+            safeName = path.basename(urlObj.pathname);
+          } catch (e) {
+            safeName = 'download';
+          }
+        }
+        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName || 'file')}"`);
+      }
 
       const arrayBuffer = await response.arrayBuffer();
       res.send(Buffer.from(arrayBuffer));

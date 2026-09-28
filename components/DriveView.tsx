@@ -856,8 +856,10 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
             <div className="flex items-center gap-2">
               {/* Unduh button in header */}
               <a
-                href={`${previewFile.url}${previewFile.url.includes('?') ? '&' : '?'}ik-attachment=true`}
+                href={getProxiedUrl(previewFile.url, true, previewFile.name)}
                 download={previewFile.name}
+                target="_blank"
+                rel="noreferrer"
                 className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
               >
                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
@@ -886,7 +888,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
               <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
                   referrerPolicy="no-referrer"
-                  src={getProxiedUrl(previewFile.url)}
+                  src={getProxiedUrl(previewFile.url, true)}
                   alt={previewFile.name}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
@@ -898,7 +900,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                   <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen via Google Engine...</p>
                 </div>
                 <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url))}&embedded=true`}
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
                   className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
                   title="Google Document Viewer"
                 />

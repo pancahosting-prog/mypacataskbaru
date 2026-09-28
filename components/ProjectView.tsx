@@ -1204,7 +1204,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
             <div className="flex items-center gap-2">
               <a
-                href={`${previewFile.url}${previewFile.url.includes('?') ? '&' : '?'}ik-attachment=true`}
+                href={getProxiedUrl(previewFile.url, true, previewFile.name)}
                 download={previewFile.name}
                 target="_blank"
                 rel="noreferrer"
@@ -1235,7 +1235,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
               <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
                   referrerPolicy="no-referrer"
-                  src={getProxiedUrl(previewFile.url)}
+                  src={getProxiedUrl(previewFile.url, true)}
                   alt={previewFile.name}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
@@ -1247,7 +1247,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                   <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen di Dalam Aplikasi via Google Viewer...</p>
                 </div>
                 <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url))}&embedded=true`}
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
                   className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
                   title="Google Document Viewer"
                 />
