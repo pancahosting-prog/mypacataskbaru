@@ -55,6 +55,8 @@ const App: React.FC = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive' | 'project' | 'qa'>('analytics'); 
   const [assignSubView, setAssignSubView] = useState<CalendarViewType>('month');
+  const [trackingViewMode, setTrackingViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [trackingCalendarSubView, setTrackingCalendarSubView] = useState<CalendarViewType>('month');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -921,9 +923,103 @@ const App: React.FC = () => {
            )}
 
            {view === 'tracking' && currentUser.role === 'superadmin' && (
-             <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full">
-                <div className="mb-10 flex justify-between items-center"><div><h3 className="text-2xl font-black text-slate-800 tracking-tight">Tracking Per User</h3></div><select value={targetUser} onChange={e => { setTargetUser(e.target.value); if(e.target.value) fetchTargetTasks(e.target.value); }} className="p-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none w-80 focus:border-indigo-500 transition-all shadow-sm text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800"><option value="">Pilih User Untuk Track</option>{allUsers.filter(u => u.username !== 'superadmin').map(u => (<option key={u.username} value={u.username}>{u.name} (@{u.username})</option>))}</select></div>
-                {targetUser ? <ListView tasks={targetUserTasks} onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} onDeleteTask={handleDeleteTask} onColorChange={() => {}} /> : <div className="flex-1 flex flex-col items-center justify-center py-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 uppercase font-black tracking-widest text-[10px]">Pilih user di atas untuk melihat laporan pekerjaan mereka</div>}
+             <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full space-y-8">
+                {/* Header & User Selector & View Toggle */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+                  <div>
+                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Tracking Per User</h3>
+                    <p className="text-xs font-semibold text-slate-400 mt-1">Pantau kalender dan laporan progres tugas per user secara real-time.</p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                    {/* View Mode Toggle (Calendar vs List) */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-xs">
+                      <button
+                        onClick={() => setTrackingViewMode('calendar')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                          trackingViewMode === 'calendar' 
+                            ? 'bg-indigo-600 text-white shadow-md' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                        Kalender
+                      </button>
+                      <button
+                        onClick={() => setTrackingViewMode('list')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all ${
+                          trackingViewMode === 'list' 
+                            ? 'bg-indigo-600 text-white shadow-md' 
+                            : 'text-slate-500 hover:text-slate-800 dark:hover:text-white'
+                        }`}
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><circle cx="3" cy="6" r="1"/><circle cx="3" cy="12" r="1"/><circle cx="3" cy="18" r="1"/></svg>
+                        Tipe List
+                      </button>
+                    </div>
+
+                    {/* User Selection Dropdown */}
+                    <select 
+                      value={targetUser} 
+                      onChange={e => { 
+                        setTargetUser(e.target.value); 
+                        if(e.target.value) fetchTargetTasks(e.target.value); 
+                      }} 
+                      className="p-3 px-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl font-bold text-sm outline-none focus:border-indigo-500 transition-all shadow-xs text-slate-800 dark:text-white min-w-[240px]"
+                    >
+                      <option value="">-- Pilih User Untuk Track --</option>
+                      {allUsers.filter(u => u.username !== 'superadmin').map(u => (
+                        <option key={u.username} value={u.username}>{u.name} (@{u.username})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Content Area */}
+                {targetUser ? (
+                  <div className="space-y-6 flex-1">
+                    {trackingViewMode === 'calendar' ? (
+                      <div className="space-y-6 animate-fade-in">
+                        <CalendarHeader 
+                          currentDate={currentDate} 
+                          view={trackingCalendarSubView} 
+                          setView={setTrackingCalendarSubView} 
+                          onPrev={() => changeDate(-1)} 
+                          onNext={() => changeDate(1)} 
+                          onToday={() => setCurrentDate(new Date())} 
+                        />
+                        <div className="pt-2">
+                          {trackingCalendarSubView === 'month' && (
+                            <MonthView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />
+                          )}
+                          {trackingCalendarSubView === 'week' && (
+                            <WeekView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />
+                          )}
+                          {trackingCalendarSubView === 'day' && (
+                            <DayView currentDate={currentDate} tasks={targetUserTasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="animate-fade-in">
+                        <ListView 
+                          tasks={targetUserTasks} 
+                          onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} 
+                          onDeleteTask={handleDeleteTask} 
+                          showTrackingDetails={true} 
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center py-20 bg-slate-50/50 dark:bg-slate-950/30 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px] text-center p-8">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mb-4 shadow-xs">
+                      <svg className="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <h4 className="text-base font-black text-slate-800 dark:text-white mb-1">Pilih User Terlebih Dahulu</h4>
+                    <p className="text-xs font-medium text-slate-400 max-w-md">Silakan pilih salah satu user dari dropdown di atas untuk memantau kalender atau daftar tugas mereka.</p>
+                  </div>
+                )}
              </div>
            )}
 
