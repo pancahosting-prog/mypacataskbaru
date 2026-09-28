@@ -343,21 +343,21 @@ export const QAView: React.FC<QAViewProps> = ({
   };
 
   return (
-    <div className="p-6 lg:p-10 space-y-8 animate-fade-in text-slate-800 dark:text-slate-100">
+    <div className="p-4 sm:p-6 lg:p-10 space-y-8 animate-fade-in text-slate-800 dark:text-slate-100 w-full max-w-full overflow-hidden box-border">
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden">
-        <div className="space-y-2 z-10 max-w-2xl">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-6 lg:p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden w-full max-w-full">
+        <div className="space-y-2 z-10 max-w-2xl min-w-0">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 text-[10px] font-black uppercase tracking-widest border border-indigo-400/30">
             <span>💬 Forum Diskusi & Knowledge Base PT Panca</span>
           </div>
-          <h2 className="text-2xl lg:text-3xl font-black tracking-tight">Q&A Engineering & Project Forum</h2>
+          <h2 className="text-2xl lg:text-3xl font-black tracking-tight leading-tight">Q&A Engineering & Project Forum</h2>
           <p className="text-sm text-indigo-200 leading-relaxed">
             Ajukan pertanyaan teknis, kendala lapangan, atau konfigurasi sistem. Setiap pertanyaan dan jawaban dapat diedit atau dihapus oleh pemiliknya atau Superadmin.
           </p>
         </div>
         <button
           onClick={() => setIsAskModalOpen(true)}
-          className="z-10 px-8 py-4 bg-indigo-500 hover:bg-indigo-400 text-white font-black rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-3 shrink-0"
+          className="z-10 px-6 py-3.5 sm:px-8 sm:py-4 bg-indigo-500 hover:bg-indigo-400 text-white font-black rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-2.5 shrink-0 text-sm"
         >
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
           <span>Buat Pertanyaan Baru</span>
@@ -365,8 +365,8 @@ export const QAView: React.FC<QAViewProps> = ({
       </div>
 
       {/* Filter & Search Bar */}
-      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
-        <div className="relative w-full lg:w-96">
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between w-full max-w-full min-w-0">
+        <div className="relative w-full lg:w-96 shrink-0 min-w-0">
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <input
             type="text"
@@ -377,12 +377,12 @@ export const QAView: React.FC<QAViewProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto w-full lg:w-auto no-scrollbar py-1">
+        <div className="flex items-center gap-2 overflow-x-auto w-full lg:w-auto no-scrollbar py-1 max-w-full shrink min-w-0">
           {categories.map(cat => (
             <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap shrink-0 ${
                 selectedCategory === cat
                   ? 'bg-indigo-600 text-white shadow-md'
                   : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
@@ -395,9 +395,9 @@ export const QAView: React.FC<QAViewProps> = ({
       </div>
 
       {/* Question Cards List */}
-      <div className="space-y-6">
+      <div className="space-y-6 w-full max-w-full min-w-0">
         {filteredQuestions.length === 0 ? (
-          <div className="p-16 text-center bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px]">
+          <div className="p-12 sm:p-16 text-center bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px] w-full max-w-full">
             <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-2">Belum ada diskusi Q&A ditemukan</p>
             <p className="text-slate-500 text-sm">Klik tombol "Buat Pertanyaan Baru" untuk memulai diskusi pertanyaan teknis.</p>
           </div>
@@ -410,17 +410,17 @@ export const QAView: React.FC<QAViewProps> = ({
             return (
               <div
                 key={q.id}
-                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[28px] p-6 lg:p-8 shadow-sm hover:shadow-md transition-all space-y-6"
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[28px] p-5 sm:p-6 lg:p-8 shadow-sm hover:shadow-md transition-all space-y-6 w-full max-w-full overflow-hidden min-w-0"
               >
                 {/* Question Header & Author Details */}
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-black flex items-center justify-center text-sm shadow-sm">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800 w-full min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 max-w-full">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-black flex items-center justify-center text-sm shadow-sm shrink-0">
                       {q.author_name ? q.author_name.charAt(0).toUpperCase() : 'U'}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-black text-slate-800 dark:text-white text-sm">{q.author_name}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-slate-800 dark:text-white text-sm truncate max-w-[150px] sm:max-w-xs">{q.author_name}</span>
                         <span className="text-xs text-slate-400">@{q.author_username}</span>
                         <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${getRoleBadgeStyle(q.author_role)}`}>
                           {q.author_role}
@@ -432,8 +432,8 @@ export const QAView: React.FC<QAViewProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-wider rounded-lg border border-indigo-100 dark:border-indigo-900/50 mr-2">
+                  <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-wider rounded-lg border border-indigo-100 dark:border-indigo-900/50">
                       {q.category}
                     </span>
 
@@ -465,11 +465,11 @@ export const QAView: React.FC<QAViewProps> = ({
                 </div>
 
                 {/* Question Body (Preserves Line Breaks / Enters perfectly) */}
-                <div className="space-y-3">
-                  <h3 className="text-xl font-black text-slate-900 dark:text-white leading-snug">
+                <div className="space-y-3 min-w-0 max-w-full">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white leading-snug break-words max-w-full">
                     {q.title}
                   </h3>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-pre-wrap break-words leading-relaxed">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-pre-wrap break-words max-w-full leading-relaxed overflow-hidden">
                     {q.content}
                   </p>
                 </div>
@@ -493,16 +493,16 @@ export const QAView: React.FC<QAViewProps> = ({
 
                 {/* Latest Answer Preview Banner */}
                 {latestAnswer ? (
-                  <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-amber-200/50 dark:border-amber-900/30">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse"></span>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-900 dark:text-amber-300">
+                  <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 rounded-2xl p-4 sm:p-5 space-y-3 min-w-0 max-w-full overflow-hidden">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-amber-200/50 dark:border-amber-900/30 min-w-0 max-w-full">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse shrink-0"></span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-900 dark:text-amber-300 truncate">
                           Jawaban Terbaru dari {latestAnswer.author_name} ({latestAnswer.author_role})
                         </span>
                       </div>
                       
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="text-[10px] font-bold text-amber-700/80 dark:text-amber-400">
                           {new Date(latestAnswer.created_at).toLocaleString('id-ID')}
                         </span>
@@ -530,26 +530,26 @@ export const QAView: React.FC<QAViewProps> = ({
                       </div>
                     </div>
 
-                    <p className="text-sm font-medium text-amber-950 dark:text-amber-100 whitespace-pre-wrap break-words leading-relaxed">
+                    <p className="text-sm font-medium text-amber-950 dark:text-amber-100 whitespace-pre-wrap break-words max-w-full leading-relaxed overflow-hidden">
                       {latestAnswer.content}
                     </p>
 
                     {latestAnswer.attachments && latestAnswer.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-1">
+                      <div className="flex flex-wrap gap-2 pt-1 max-w-full">
                         {latestAnswer.attachments.map(att => (
                           <button
                             key={att.id}
                             onClick={() => setPreviewAttachment(att)}
-                            className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5"
+                            className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5 max-w-full"
                           >
-                            <span>📎 {att.name}</span>
+                            <span className="truncate max-w-[200px]">📎 {att.name}</span>
                           </button>
                         ))}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl text-center text-xs font-bold text-slate-400">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl text-center text-xs font-bold text-slate-400 w-full">
                     Belum ada jawaban untuk pertanyaan ini. Jadilah yang pertama memberikan jawaban!
                   </div>
                 )}
