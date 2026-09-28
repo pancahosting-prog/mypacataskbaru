@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Task, TaskLog, CalendarViewType, Project } from './types';
+import { Task, TaskLog, CalendarViewType, Project, QAQuestion, QAAnswer } from './types';
 import CalendarHeader from './components/CalendarHeader';
 import MonthView from './components/MonthView';
 import WeekView from './components/WeekView';
@@ -15,6 +15,7 @@ import { supabaseService } from './services/supabaseService';
 import { DriveView } from './components/DriveView';
 import { SharedPostView } from './components/SharedPostView';
 import { ProjectView } from './components/ProjectView';
+import { QAView } from './components/QAView';
 
 interface UserSession {
   username: string;
@@ -50,8 +51,9 @@ const App: React.FC = () => {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [qaQuestions, setQaQuestions] = useState<QAQuestion[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive' | 'project'>('analytics'); 
+  const [view, setView] = useState<CalendarViewType | 'analytics' | 'users' | 'assign' | 'tracking' | 'messages' | 'drive' | 'project' | 'qa'>('analytics'); 
   const [assignSubView, setAssignSubView] = useState<CalendarViewType>('month');
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [selectedLogIndex, setSelectedLogIndex] = useState<number>(-1);
@@ -87,6 +89,7 @@ const App: React.FC = () => {
       fetchSticky();
       fetchUsers();
       fetchProjects();
+      fetchQAQuestions();
     }
   }, [currentUser]);
 
@@ -167,6 +170,66 @@ const App: React.FC = () => {
     } catch (e) {
       console.error('Save project failed:', e);
       alert('Gagal menyimpan project.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus data project ini?')) return;
+    setIsSyncing(true);
+    try {
+      const updatedList = await supabaseService.deleteProject(projectId);
+      setProjects(updatedList);
+    } catch (e) {
+      console.error('Delete project failed:', e);
+      alert('Gagal menghapus project.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const fetchQAQuestions = async () => {
+    try {
+      const data = await supabaseService.getQAQuestions();
+      setQaQuestions(data);
+    } catch (e) {
+      console.error('Fetch QA questions failed:', e);
+    }
+  };
+
+  const handleCreateQAQuestion = async (q: QAQuestion) => {
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.createQAQuestion(q);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Create QA question failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleCreateQAAnswer = async (ans: QAAnswer) => {
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.createQAAnswer(ans);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Create QA answer failed:', e);
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleDeleteQAQuestion = async (qId: string) => {
+    if (!confirm('Apakah Anda yakin ingin menghapus pertanyaan ini?')) return;
+    setIsSyncing(true);
+    try {
+      const updated = await supabaseService.deleteQAQuestion(qId);
+      setQaQuestions(updated);
+    } catch (e) {
+      console.error('Delete QA question failed:', e);
     } finally {
       setIsSyncing(false);
     }
@@ -450,6 +513,14 @@ const App: React.FC = () => {
               </div>
               {!isSidebarCollapsed && <span>Project Database</span>}
             </button>
+            <button onClick={() => setView('qa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'qa' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
+              <div className="w-6 flex justify-center">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.38 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.38 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                </svg>
+              </div>
+              {!isSidebarCollapsed && <span>Q&A Forum</span>}
+            </button>
             {currentUser.role === 'superadmin' && (
               <>
                 <button onClick={() => setView('assign')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
@@ -536,6 +607,17 @@ const App: React.FC = () => {
                currentUser={currentUser}
                projects={projects}
                onSaveProject={handleSaveProject}
+               onDeleteProject={handleDeleteProject}
+             />
+           )}
+
+           {view === 'qa' && (
+             <QAView
+               currentUser={currentUser}
+               questions={qaQuestions}
+               onCreateQuestion={handleCreateQAQuestion}
+               onCreateAnswer={handleCreateQAAnswer}
+               onDeleteQuestion={handleDeleteQAQuestion}
              />
            )}
 

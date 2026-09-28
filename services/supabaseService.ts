@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Task, TaskLog, TaskStatus, TaskPriority, DrivePost, DriveAttachment } from '../types';
+import { Task, TaskLog, TaskStatus, TaskPriority, DrivePost, DriveAttachment, Project, QAQuestion, QAAnswer, QAAttachment } from '../types';
 
 // Menggunakan kredensial yang diberikan oleh user
 const supabaseUrl = 'https://ujoiqrmcszrkvbebacvm.supabase.co';
@@ -320,32 +320,39 @@ export const supabaseService = {
         .select('*')
         .order('created_at', { ascending: false });
 
-      if (!error && data && data.length > 0) {
-        return data.map((p: any) => ({
-          id: p.id,
-          code: p.code,
-          title: p.title,
-          clientName: p.client_name,
-          location: p.location,
-          status: p.status,
-          leadEngineer: p.lead_engineer,
-          startDate: p.start_date,
-          completionDate: p.completion_date,
-          description: p.description,
-          files: p.files || { engineering: [], commercial: [], finance: [], documentation: [] },
-          notes: p.notes || [],
-          created_at: p.created_at
-        }));
+      if (!error && data) {
+        if (data.length > 0) {
+          const mapped = data.map((p: any) => ({
+            id: p.id,
+            code: p.code,
+            title: p.title,
+            clientName: p.client_name,
+            location: p.location,
+            status: p.status,
+            leadEngineer: p.lead_engineer,
+            startDate: p.start_date,
+            completionDate: p.completion_date,
+            description: p.description,
+            files: p.files || { engineering: [], commercial: [], finance: [], documentation: [] },
+            notes: p.notes || [],
+            created_at: p.created_at
+          }));
+          localStorage.setItem('mypanca_projects_db', JSON.stringify(mapped));
+          return mapped;
+        }
       }
     } catch (e) {
-      console.log('Supabase project table query fallback to local storage');
+      console.log('Supabase project table query fallback to local storage', e);
     }
 
     // Fallback LocalStorage Sync
     const local = localStorage.getItem('mypanca_projects_db');
     if (local) {
       try {
-        return JSON.parse(local);
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
       } catch (err) {
         console.error('Failed to parse local projects:', err);
       }
@@ -495,7 +502,7 @@ export const supabaseService = {
     localStorage.setItem('mypanca_projects_db', JSON.stringify(updatedList));
 
     try {
-      await supabase.from('projects').upsert({
+      const { error } = await supabase.from('projects').upsert({
         id: project.id,
         code: project.code,
         title: project.title,
@@ -510,10 +517,198 @@ export const supabaseService = {
         notes: project.notes,
         updated_at: new Date().toISOString()
       });
+      if (error) {
+        console.warn('Supabase projects table error (run SQL script in Supabase dashboard if table is missing):', error.message);
+      }
     } catch (e) {
-      console.log('Supabase project save fallback to local storage');
+      console.log('Supabase project save fallback to local storage', e);
     }
 
     return updatedList;
+  },
+
+  async deleteProject(projectId: string): Promise<Project[]> {
+    const currentProjects = await this.getProjects();
+    const updatedList = currentProjects.filter(p => p.id !== projectId);
+    localStorage.setItem('mypanca_projects_db', JSON.stringify(updatedList));
+
+    try {
+      await supabase.from('projects').delete().eq('id', projectId);
+    } catch (e) {
+      console.log('Supabase project delete fallback to local storage');
+    }
+
+    return updatedList;
+  },
+
+  // --- Q&A Forum System ---
+  async getQAQuestions(): Promise<QAQuestion[]> {
+    try {
+      const { data: qData, error: qError } = await supabase
+        .from('qa_questions')
+        .select('*, qa_answers(*)')
+        .order('created_at', { ascending: false });
+
+      if (!qError && qData) {
+        const questions: QAQuestion[] = qData.map((q: any) => {
+          const answers: QAAnswer[] = (q.qa_answers || [])
+            .map((a: any) => ({
+              id: a.id,
+              question_id: a.question_id,
+              content: a.content,
+              attachments: a.attachments || [],
+              author_username: a.author_username,
+              author_name: a.author_name,
+              author_role: a.author_role,
+              created_at: a.created_at
+            }))
+            // Sort answers so latest answers appear first
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+          return {
+            id: q.id,
+            title: q.title,
+            content: q.content,
+            category: q.category || 'Teknis & Engineering',
+            attachments: q.attachments || [],
+            author_username: q.author_username,
+            author_name: q.author_name,
+            author_role: q.author_role,
+            created_at: q.created_at,
+            answers,
+            latest_answer_at: answers.length > 0 ? answers[0].created_at : q.created_at
+          };
+        });
+
+        // Sort questions by latest answer or question creation date
+        questions.sort((a, b) => {
+          const timeA = new Date(a.latest_answer_at || a.created_at).getTime();
+          const timeB = new Date(b.latest_answer_at || b.created_at).getTime();
+          return timeB - timeA;
+        });
+
+        localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
+        return questions;
+      }
+    } catch (e) {
+      console.log('Supabase QA query fallback to local storage', e);
+    }
+
+    const local = localStorage.getItem('mypanca_qa_questions');
+    if (local) {
+      try {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (err) {
+        console.error('Failed to parse local QA questions:', err);
+      }
+    }
+
+    // Default Initial Questions
+    const defaultQuestions: QAQuestion[] = [
+      {
+        id: 'qa_001',
+        title: 'Bagaimana cara mengatasi false alarm pada Sensor Gempa saat motor industri start?',
+        content: 'Saat motor bertenaga tinggi di plant dihidupkan, vibration sensor gempa di panel terkadang terpicu dan memicu sinyal shutdown darurat. Mohon panduan cara filter noise atau penyesuaian threshold sensitivitasnya.',
+        category: 'Sensor & Automation',
+        attachments: [],
+        author_username: 'arie',
+        author_name: 'Arie',
+        author_role: 'Engineer',
+        created_at: '2026-02-10T08:30:00Z',
+        latest_answer_at: '2026-02-10T10:15:00Z',
+        answers: [
+          {
+            id: 'ans_001',
+            question_id: 'qa_001',
+            content: 'Gunakan kabel Shielded Twisted Pair (STP) dan pastikan grounding tersambung satu titik (single-point grounding) di panel utama. Selain itu, aktifkan waktu tunda (time delay filter) 500ms pada PLC agar spike getaran saat motor start-up tidak memicu shutdown.',
+            attachments: [],
+            author_username: 'evan',
+            author_name: 'Evan',
+            author_role: 'Senior Engineer',
+            created_at: '2026-02-10T10:15:00Z'
+          }
+        ]
+      }
+    ];
+
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(defaultQuestions));
+    return defaultQuestions;
+  },
+
+  async createQAQuestion(question: QAQuestion): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const updated = [question, ...questions];
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(updated));
+
+    try {
+      const { error } = await supabase.from('qa_questions').insert([{
+        id: question.id,
+        title: question.title,
+        content: question.content,
+        category: question.category,
+        attachments: question.attachments,
+        author_username: question.author_username,
+        author_name: question.author_name,
+        author_role: question.author_role,
+        created_at: question.created_at
+      }]);
+      if (error) console.warn('Supabase createQAQuestion table error:', error.message);
+    } catch (e) {
+      console.log('Supabase createQAQuestion fallback to local storage', e);
+    }
+
+    return updated;
+  },
+
+  async createQAAnswer(answer: QAAnswer): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const qIndex = questions.findIndex(q => q.id === answer.question_id);
+
+    if (qIndex >= 0) {
+      const q = questions[qIndex];
+      const newAnswers = [answer, ...(q.answers || [])];
+      const updatedQ: QAQuestion = {
+        ...q,
+        answers: newAnswers,
+        latest_answer_at: answer.created_at
+      };
+      questions[qIndex] = updatedQ;
+    }
+
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(questions));
+
+    try {
+      const { error } = await supabase.from('qa_answers').insert([{
+        id: answer.id,
+        question_id: answer.question_id,
+        content: answer.content,
+        attachments: answer.attachments,
+        author_username: answer.author_username,
+        author_name: answer.author_name,
+        author_role: answer.author_role,
+        created_at: answer.created_at
+      }]);
+      if (error) console.warn('Supabase createQAAnswer table error:', error.message);
+    } catch (e) {
+      console.log('Supabase createQAAnswer fallback to local storage', e);
+    }
+
+    return questions;
+  },
+
+  async deleteQAQuestion(questionId: string): Promise<QAQuestion[]> {
+    const questions = await this.getQAQuestions();
+    const updated = questions.filter(q => q.id !== questionId);
+    localStorage.setItem('mypanca_qa_questions', JSON.stringify(updated));
+
+    try {
+      await supabase.from('qa_answers').delete().eq('question_id', questionId);
+      await supabase.from('qa_questions').delete().eq('id', questionId);
+    } catch (e) {
+      console.log('Supabase deleteQAQuestion fallback to local storage', e);
+    }
+
+    return updated;
   }
 };

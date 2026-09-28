@@ -95,3 +95,36 @@ export interface Project {
   created_at?: string;
   updated_at?: string;
 }
+
+export interface QAAttachment {
+  id: string;
+  name: string;
+  url: string;
+  fileType: string;
+  size?: number;
+}
+
+export interface QAAnswer {
+  id: string;
+  question_id: string;
+  content: string;
+  attachments?: QAAttachment[];
+  author_username: string;
+  author_name: string;
+  author_role: string;
+  created_at: string;
+}
+
+export interface QAQuestion {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  attachments?: QAAttachment[];
+  author_username: string;
+  author_name: string;
+  author_role: string;
+  created_at: string;
+  answers: QAAnswer[];
+  latest_answer_at?: string;
+}

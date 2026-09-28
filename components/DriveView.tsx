@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrivePost, DriveAttachment } from '../types';
 import { supabaseService } from '../services/supabaseService';
+import { getProxiedUrl } from '../services/proxyService';
 
 interface DriveViewProps {
   currentUser: {
@@ -885,7 +886,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
               <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
                   referrerPolicy="no-referrer"
-                  src={previewFile.url}
+                  src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
@@ -897,7 +898,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                   <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen via Google Engine...</p>
                 </div>
                 <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(previewFile.url)}&embedded=true`}
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url))}&embedded=true`}
                   className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
                   title="Google Document Viewer"
                 />

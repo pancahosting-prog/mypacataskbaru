@@ -1,0 +1,716 @@
+import React, { useState } from 'react';
+import { QAQuestion, QAAnswer, QAAttachment } from '../types';
+import { getProxiedUrl } from '../services/proxyService';
+
+interface QAViewProps {
+  currentUser: {
+    username: string;
+    role: string;
+    name: string;
+  };
+  questions: QAQuestion[];
+  onCreateQuestion: (question: QAQuestion) => Promise<void>;
+  onCreateAnswer: (answer: QAAnswer) => Promise<void>;
+  onDeleteQuestion?: (questionId: string) => Promise<void>;
+}
+
+export const QAView: React.FC<QAViewProps> = ({
+  currentUser,
+  questions,
+  onCreateQuestion,
+  onCreateAnswer,
+  onDeleteQuestion
+}) => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('Semua');
+  const [selectedQuestion, setSelectedQuestion] = useState<QAQuestion | null>(null);
+
+  // Modals
+  const [isAskModalOpen, setIsAskModalOpen] = useState(false);
+  const [isAnswerModalOpen, setIsAnswerModalOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<QAAttachment | null>(null);
+
+  // Ask Form State
+  const [newTitle, setNewTitle] = useState('');
+  const [newCategory, setNewCategory] = useState('Sensor & Automation');
+  const [newContent, setNewContent] = useState('');
+  const [askAttachments, setAskAttachments] = useState<QAAttachment[]>([]);
+  const [isUploadingAskFile, setIsUploadingAskFile] = useState(false);
+  const [askUploadError, setAskUploadError] = useState('');
+
+  // Answer Form State
+  const [answerContent, setAnswerContent] = useState('');
+  const [answerAttachments, setAnswerAttachments] = useState<QAAttachment[]>([]);
+  const [isUploadingAnswerFile, setIsUploadingAnswerFile] = useState(false);
+  const [answerUploadError, setAnswerUploadError] = useState('');
+
+  // ImageKit Web Crypto Uploader
+  const uploadToImageKit = async (file: File): Promise<{ url: string; fileId: string; size: number }> => {
+    const envUrl = (import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || '').trim();
+    const envPublic = (import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
+    const envPrivate = (import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '').trim();
+
+    const ikUrl = envUrl || localStorage.getItem('mypanca_imagekit_url') || '';
+    const ikPublic = envPublic || localStorage.getItem('mypanca_imagekit_public') || '';
+    const ikPrivate = envPrivate || localStorage.getItem('mypanca_imagekit_private') || '';
+
+    if (!ikUrl || !ikPublic || !ikPrivate) {
+      throw new Error('Konfigurasi ImageKit belum lengkap. Pastikan VITE_IMAGEKIT_URL_ENDPOINT, VITE_IMAGEKIT_PUBLIC_KEY, dan VITE_IMAGEKIT_PRIVATE_KEY terisi.');
+    }
+
+    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const expire = Math.floor(Date.now() / 1000) + 1800;
+
+    const encoder = new TextEncoder();
+    const encodedKey = encoder.encode(ikPrivate.trim());
+    const encodedData = encoder.encode(token + expire);
+
+    const hmacKey = await window.crypto.subtle.importKey(
+      'raw',
+      encodedKey,
+      { name: 'HMAC', hash: 'SHA-1' },
+      true,
+      ['sign']
+    );
+
+    const signatureBuffer = await window.crypto.subtle.sign(
+      'HMAC',
+      hmacKey,
+      encodedData
+    );
+
+    const signatureHex = Array.from(new Uint8Array(signatureBuffer))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fileName', file.name);
+    formData.append('publicKey', ikPublic.trim());
+    formData.append('signature', signatureHex);
+    formData.append('token', token);
+    formData.append('expire', expire.toString());
+    formData.append('useUniqueFileName', 'true');
+    formData.append('folder', '/mypanca_qa');
+
+    const response = await fetch('https://upload.imagekit.io/api/v1/files/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      let parsedErr;
+      try { parsedErr = JSON.parse(errText); } catch (e) {}
+      throw new Error(parsedErr?.message || `Upload ImageKit Gagal (${response.status})`);
+    }
+
+    const result = await response.json();
+    return {
+      url: result.url,
+      fileId: result.fileId,
+      size: result.size || file.size,
+    };
+  };
+
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    target: 'ask' | 'answer'
+  ) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    if (target === 'ask') {
+      setIsUploadingAskFile(true);
+      setAskUploadError('');
+    } else {
+      setIsUploadingAnswerFile(true);
+      setAnswerUploadError('');
+    }
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const res = await uploadToImageKit(file);
+        const fileType = file.type.startsWith('image/')
+          ? 'img'
+          : file.type.includes('pdf')
+          ? 'pdf'
+          : 'file';
+
+        const item: QAAttachment = {
+          id: `att_${Date.now()}_${i}`,
+          name: file.name,
+          url: res.url,
+          fileType,
+          size: res.size
+        };
+
+        if (target === 'ask') {
+          setAskAttachments(prev => [...prev, item]);
+        } else {
+          setAnswerAttachments(prev => [...prev, item]);
+        }
+      }
+    } catch (err: any) {
+      if (target === 'ask') {
+        setAskUploadError(err.message || 'Gagal mengunggah berkas.');
+      } else {
+        setAnswerUploadError(err.message || 'Gagal mengunggah berkas.');
+      }
+    } finally {
+      if (target === 'ask') setIsUploadingAskFile(false);
+      else setIsUploadingAnswerFile(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleCreateQuestion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+
+    const questionItem: QAQuestion = {
+      id: `qa_${Date.now()}`,
+      title: newTitle.trim(),
+      category: newCategory,
+      content: newContent.trim(),
+      attachments: askAttachments,
+      author_username: currentUser.username,
+      author_name: currentUser.name,
+      author_role: currentUser.role,
+      created_at: new Date().toISOString(),
+      answers: [],
+      latest_answer_at: new Date().toISOString()
+    };
+
+    await onCreateQuestion(questionItem);
+    setIsAskModalOpen(false);
+    setNewTitle('');
+    setNewContent('');
+    setAskAttachments([]);
+  };
+
+  const handleCreateAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedQuestion || !answerContent.trim()) return;
+
+    const answerItem: QAAnswer = {
+      id: `ans_${Date.now()}`,
+      question_id: selectedQuestion.id,
+      content: answerContent.trim(),
+      attachments: answerAttachments,
+      author_username: currentUser.username,
+      author_name: currentUser.name,
+      author_role: currentUser.role,
+      created_at: new Date().toISOString()
+    };
+
+    await onCreateAnswer(answerItem);
+
+    // Update locally in view
+    const updatedQuestion: QAQuestion = {
+      ...selectedQuestion,
+      answers: [answerItem, ...(selectedQuestion.answers || [])],
+      latest_answer_at: answerItem.created_at
+    };
+    setSelectedQuestion(updatedQuestion);
+
+    setIsAnswerModalOpen(false);
+    setAnswerContent('');
+    setAnswerAttachments([]);
+  };
+
+  const categories = [
+    'Semua',
+    'Sensor & Automation',
+    'Teknis & Engineering',
+    'Wiring & SLD',
+    'Commercial & Budget',
+    'SOP & Commissioning',
+    'General / Umum'
+  ];
+
+  const filteredQuestions = questions.filter(q => {
+    const matchesSearch =
+      q.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.author_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.answers.some(a => a.content.toLowerCase().includes(searchQuery.toLowerCase()) || a.author_name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    const matchesCategory = selectedCategory === 'Semua' || q.category === selectedCategory;
+    return matchesSearch && matchesCategory;
+  });
+
+  const getRoleBadgeStyle = (role: string) => {
+    const r = (role || '').toLowerCase();
+    if (r === 'superadmin') return 'bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300';
+    if (r === 'engineer' || r.includes('engineer')) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300';
+    if (r === 'commercial') return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300';
+    if (r === 'finance') return 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300';
+    return 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300';
+  };
+
+  return (
+    <div className="p-6 lg:p-10 space-y-8 animate-fade-in text-slate-800 dark:text-slate-100">
+      {/* Header Banner */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 p-8 rounded-[32px] text-white shadow-xl relative overflow-hidden">
+        <div className="space-y-2 z-10 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/30 text-indigo-200 text-[10px] font-black uppercase tracking-widest border border-indigo-400/30">
+            <span>💬 Forum Diskusi & Knowledge Base PT Panca</span>
+          </div>
+          <h2 className="text-2xl lg:text-3xl font-black tracking-tight">Q&A Engineering & Project Forum</h2>
+          <p className="text-sm text-indigo-200 leading-relaxed">
+            Ajukan pertanyaan teknis, kendala lapangan, atau konfigurasi sistem. Setiap jawaban terbaru akan langsung tampil di paling atas.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsAskModalOpen(true)}
+          className="z-10 px-8 py-4 bg-indigo-500 hover:bg-indigo-400 text-white font-black rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all active:scale-95 flex items-center gap-3 shrink-0"
+        >
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          <span>Buat Pertanyaan Baru</span>
+        </button>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="flex flex-col lg:flex-row gap-4 items-center justify-between">
+        <div className="relative w-full lg:w-96">
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input
+            type="text"
+            placeholder="Cari pertanyaan, kendala, atau nama engineer..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-11 pr-4 py-3.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-sm font-bold outline-none focus:border-indigo-500 transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto w-full lg:w-auto no-scrollbar py-1">
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-4 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all whitespace-nowrap ${
+                selectedCategory === cat
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Question Cards List */}
+      <div className="space-y-6">
+        {filteredQuestions.length === 0 ? (
+          <div className="p-16 text-center bg-slate-50 dark:bg-slate-950 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-[32px]">
+            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs mb-2">Belum ada diskusi Q&A ditemukan</p>
+            <p className="text-slate-500 text-sm">Klik tombol "Buat Pertanyaan Baru" untuk memulai diskusi pertanyaan teknis.</p>
+          </div>
+        ) : (
+          filteredQuestions.map(q => {
+            const latestAnswer = q.answers && q.answers.length > 0 ? q.answers[0] : null;
+
+            return (
+              <div
+                key={q.id}
+                className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-[28px] p-6 lg:p-8 shadow-sm hover:shadow-md transition-all space-y-6"
+              >
+                {/* Question Header & Author Details */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-2xl bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 font-black flex items-center justify-center text-sm shadow-sm">
+                      {q.author_name ? q.author_name.charAt(0).toUpperCase() : 'U'}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-slate-800 dark:text-white text-sm">{q.author_name}</span>
+                        <span className="text-xs text-slate-400">@{q.author_username}</span>
+                        <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase ${getRoleBadgeStyle(q.author_role)}`}>
+                          {q.author_role}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-400 font-bold">
+                        Ditanyakan pada: {new Date(q.created_at).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 font-black text-[10px] uppercase tracking-wider rounded-lg border border-indigo-100 dark:border-indigo-900/50">
+                      {q.category}
+                    </span>
+                    {currentUser.role === 'superadmin' && onDeleteQuestion && (
+                      <button
+                        onClick={() => onDeleteQuestion(q.id)}
+                        className="p-2 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition-colors"
+                        title="Hapus Pertanyaan"
+                      >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6"/></svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Question Body (Preserves Line Breaks / Enters perfectly) */}
+                <div className="space-y-3">
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white leading-snug">
+                    {q.title}
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 font-medium whitespace-pre-wrap break-words leading-relaxed">
+                    {q.content}
+                  </p>
+                </div>
+
+                {/* Question Attachments */}
+                {q.attachments && q.attachments.length > 0 && (
+                  <div className="flex flex-wrap gap-3 pt-2">
+                    {q.attachments.map(att => (
+                      <button
+                        key={att.id}
+                        onClick={() => setPreviewAttachment(att)}
+                        className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold hover:border-indigo-500 transition-all"
+                      >
+                        <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                        <span className="truncate max-w-[180px]">{att.name}</span>
+                        <span className="text-[10px] text-indigo-600 font-bold uppercase">(Lihat)</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Latest Answer Preview Banner (Highlight Terbaru) */}
+                {latestAnswer ? (
+                  <div className="bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/80 dark:border-amber-900/40 rounded-2xl p-5 space-y-3">
+                    <div className="flex items-center justify-between pb-2 border-b border-amber-200/50 dark:border-amber-900/30">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-pulse"></span>
+                        <span className="text-[10px] font-black uppercase tracking-widest text-amber-900 dark:text-amber-300">
+                          Jawaban Terbaru dari {latestAnswer.author_name} ({latestAnswer.author_role})
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-bold text-amber-700/80 dark:text-amber-400">
+                        {new Date(latestAnswer.created_at).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+
+                    <p className="text-sm font-medium text-amber-950 dark:text-amber-100 whitespace-pre-wrap break-words leading-relaxed">
+                      {latestAnswer.content}
+                    </p>
+
+                    {latestAnswer.attachments && latestAnswer.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {latestAnswer.attachments.map(att => (
+                          <button
+                            key={att.id}
+                            onClick={() => setPreviewAttachment(att)}
+                            className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5"
+                          >
+                            <span>📎 {att.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl text-center text-xs font-bold text-slate-400">
+                    Belum ada jawaban untuk pertanyaan ini. Jadilah yang pertama memberikan jawaban!
+                  </div>
+                )}
+
+                {/* Footer Action Buttons */}
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-xs font-bold text-slate-400">
+                    💬 {q.answers ? q.answers.length : 0} Total Jawaban
+                  </span>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        setSelectedQuestion(q);
+                        setIsAnswerModalOpen(true);
+                      }}
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black rounded-xl shadow-md transition-all active:scale-95 flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span>Jawab Pertanyaan</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Modal Ask Question */}
+      {isAskModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in max-h-[90vh] flex flex-col">
+            <form onSubmit={handleCreateQuestion} className="flex flex-col h-full overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-wider text-slate-800 dark:text-white">Buat Pertanyaan Diskusi Baru</h3>
+                  <p className="text-xs text-slate-400">Ajukan ke seluruh tim engineer PT Panca</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAskModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5 overflow-y-auto flex-1 no-scrollbar">
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Judul Pertanyaan / Topik</label>
+                  <input
+                    required
+                    type="text"
+                    placeholder="Contoh: Cara kalibrasi threshold accelerometer gempa..."
+                    value={newTitle}
+                    onChange={e => setNewTitle(e.target.value)}
+                    className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white focus:border-indigo-500 transition-all"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Kategori Topik</label>
+                  <select
+                    value={newCategory}
+                    onChange={e => setNewCategory(e.target.value)}
+                    className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white focus:border-indigo-500 transition-all"
+                  >
+                    <option value="Sensor & Automation">Sensor & Automation</option>
+                    <option value="Teknis & Engineering">Teknis & Engineering</option>
+                    <option value="Wiring & SLD">Wiring & SLD</option>
+                    <option value="Commercial & Budget">Commercial & Budget</option>
+                    <option value="SOP & Commissioning">SOP & Commissioning</option>
+                    <option value="General / Umum">General / Umum</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Isi Detail Pertanyaan (Enter & Teks Tempel Rapi)</label>
+                  <textarea
+                    required
+                    rows={5}
+                    placeholder="Jelaskan kronologi kendala, setting yang digunakan, atau detail pertanyaan..."
+                    value={newContent}
+                    onChange={e => setNewContent(e.target.value)}
+                    className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white focus:border-indigo-500 transition-all whitespace-pre-wrap break-words"
+                  />
+                </div>
+
+                {/* Upload Image / File via ImageKit */}
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Lampirkan Gambar / Berkas (ImageKit Proxy)</label>
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-all flex items-center gap-2">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <span>{isUploadingAskFile ? 'Mengunggah ke ImageKit...' : 'Pilih Gambar/File'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={e => handleFileUpload(e, 'ask')}
+                        disabled={isUploadingAskFile}
+                      />
+                    </label>
+                  </div>
+                  {askUploadError && <p className="text-xs font-bold text-rose-500">{askUploadError}</p>}
+
+                  {askAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {askAttachments.map(att => (
+                        <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                          <span>📄 {att.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAskAttachments(prev => prev.filter(x => x.id !== att.id))}
+                            className="text-rose-500 hover:text-rose-700 font-black ml-1"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAskModalOpen(false)}
+                  className="w-1/3 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm rounded-2xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingAskFile}
+                  className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                >
+                  Kirim Pertanyaan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Answer Question */}
+      {isAnswerModalOpen && selectedQuestion && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden animate-fade-in max-h-[90vh] flex flex-col">
+            <form onSubmit={handleCreateAnswer} className="flex flex-col h-full overflow-hidden">
+              <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center shrink-0">
+                <div>
+                  <h3 className="text-xl font-black uppercase tracking-wider text-slate-800 dark:text-white">Beri Jawaban / Solusi</h3>
+                  <p className="text-xs text-indigo-600 dark:text-indigo-400 font-bold truncate max-w-md">Topik: {selectedQuestion.title}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAnswerModalOpen(false)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+
+              <div className="p-6 space-y-5 overflow-y-auto flex-1 no-scrollbar">
+                {/* Question Context */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-2xl border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs font-black text-slate-400 uppercase mb-1">Pertanyaan dari {selectedQuestion.author_name}:</p>
+                  <p className="text-sm font-medium text-slate-700 dark:text-slate-200 whitespace-pre-wrap break-words">{selectedQuestion.content}</p>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Isi Jawaban Lengkap (Support Enter & Teks Tempel)</label>
+                  <textarea
+                    required
+                    rows={6}
+                    placeholder="Tuliskan solusi langkah-demi-langkah, setting threshold, atau penjelasan teknis..."
+                    value={answerContent}
+                    onChange={e => setAnswerContent(e.target.value)}
+                    className="w-full p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl outline-none font-bold text-sm text-slate-800 dark:text-white focus:border-indigo-500 transition-all whitespace-pre-wrap break-words"
+                  />
+                </div>
+
+                {/* Upload Image / File for Answer */}
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Lampirkan Gambar / Dokumentasi Pendukung</label>
+                  <div className="flex items-center gap-3">
+                    <label className="cursor-pointer px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-all flex items-center gap-2">
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                      <span>{isUploadingAnswerFile ? 'Mengunggah ke ImageKit...' : 'Pilih Gambar/File'}</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={e => handleFileUpload(e, 'answer')}
+                        disabled={isUploadingAnswerFile}
+                      />
+                    </label>
+                  </div>
+                  {answerUploadError && <p className="text-xs font-bold text-rose-500">{answerUploadError}</p>}
+
+                  {answerAttachments.length > 0 && (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {answerAttachments.map(att => (
+                        <div key={att.id} className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs font-bold">
+                          <span>📎 {att.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAnswerAttachments(prev => prev.filter(x => x.id !== att.id))}
+                            className="text-rose-500 hover:text-rose-700 font-black ml-1"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-6 border-t border-slate-100 dark:border-slate-800 flex gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsAnswerModalOpen(false)}
+                  className="w-1/3 py-3.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-sm rounded-2xl"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUploadingAnswerFile}
+                  className="w-2/3 py-3.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-sm rounded-2xl shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                >
+                  Kirim Jawaban
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* In-App Attachment Viewer Modal (Proxied through /api/proxy-file) */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="p-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 rounded-xl font-bold text-xs uppercase">
+                  {previewAttachment.fileType}
+                </span>
+                <div>
+                  <h4 className="font-black text-slate-800 dark:text-white text-base truncate max-w-md">{previewAttachment.name}</h4>
+                  <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Proxied via Server Proxy (Anti-Block Provider)</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <a
+                  href={getProxiedUrl(previewAttachment.url)}
+                  download={previewAttachment.name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md hover:bg-indigo-700 transition-all"
+                >
+                  Unduh Berkas
+                </a>
+                <button
+                  onClick={() => setPreviewAttachment(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 flex-1 overflow-y-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+              {previewAttachment.fileType === 'img' || previewAttachment.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                <img
+                  src={getProxiedUrl(previewAttachment.url)}
+                  alt={previewAttachment.name}
+                  className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
+                />
+              ) : (
+                <iframe
+                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(getProxiedUrl(previewAttachment.url))}&embedded=true`}
+                  className="w-full h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
+                  title={previewAttachment.name}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
