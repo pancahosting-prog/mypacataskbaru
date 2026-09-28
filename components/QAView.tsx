@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { QAQuestion, QAAnswer, QAAttachment } from '../types';
-import { getProxiedUrl } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
 
 interface QAViewProps {
   currentUser: {
@@ -477,17 +477,36 @@ export const QAView: React.FC<QAViewProps> = ({
                 {/* Question Attachments */}
                 {q.attachments && q.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-3 pt-2">
-                    {q.attachments.map(att => (
-                      <button
-                        key={att.id}
-                        onClick={() => setPreviewAttachment(att)}
-                        className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold hover:border-indigo-500 transition-all"
-                      >
-                        <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                        <span className="truncate max-w-[180px]">{att.name}</span>
-                        <span className="text-[10px] text-indigo-600 font-bold uppercase">(Lihat)</span>
-                      </button>
-                    ))}
+                    {q.attachments.map(att => {
+                      const isImg = isImageFile(att.fileType, att.name || att.url);
+                      return isImg ? (
+                        <button
+                          key={att.id}
+                          onClick={() => setPreviewAttachment(att)}
+                          className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-32 w-48 shadow-xs hover:border-indigo-500 transition-all text-left shrink-0 active:scale-98"
+                        >
+                          <img
+                            src={getProxiedUrl(att.url)}
+                            alt={att.name}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2.5 flex flex-col justify-end">
+                            <span className="text-[10px] font-bold text-white truncate drop-shadow-xs">{att.name}</span>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          key={att.id}
+                          onClick={() => setPreviewAttachment(att)}
+                          className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold hover:border-indigo-500 transition-all"
+                        >
+                          <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                          <span className="truncate max-w-[180px]">{att.name}</span>
+                          <span className="text-[10px] text-indigo-600 font-bold uppercase">(Lihat)</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 )}
 
@@ -535,16 +554,35 @@ export const QAView: React.FC<QAViewProps> = ({
                     </p>
 
                     {latestAnswer.attachments && latestAnswer.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-1 max-w-full">
-                        {latestAnswer.attachments.map(att => (
-                          <button
-                            key={att.id}
-                            onClick={() => setPreviewAttachment(att)}
-                            className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5 max-w-full"
-                          >
-                            <span className="truncate max-w-[200px]">📎 {att.name}</span>
-                          </button>
-                        ))}
+                      <div className="flex flex-wrap gap-2.5 pt-1 max-w-full">
+                        {latestAnswer.attachments.map(att => {
+                          const isImg = isImageFile(att.fileType, att.name || att.url);
+                          return isImg ? (
+                            <button
+                              key={att.id}
+                              onClick={() => setPreviewAttachment(att)}
+                              className="group relative rounded-xl overflow-hidden border border-amber-200 dark:border-amber-900/50 bg-slate-900 h-24 w-36 shadow-xs hover:border-amber-500 transition-all shrink-0 active:scale-98"
+                            >
+                              <img
+                                src={getProxiedUrl(att.url)}
+                                alt={att.name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2 flex flex-col justify-end">
+                                <span className="text-[9px] font-bold text-white truncate">{att.name}</span>
+                              </div>
+                            </button>
+                          ) : (
+                            <button
+                              key={att.id}
+                              onClick={() => setPreviewAttachment(att)}
+                              className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5 max-w-full"
+                            >
+                              <span className="truncate max-w-[200px]">📎 {att.name}</span>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -593,15 +631,34 @@ export const QAView: React.FC<QAViewProps> = ({
                           <p className="text-xs text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{ans.content}</p>
                           {ans.attachments && ans.attachments.length > 0 && (
                             <div className="flex flex-wrap gap-2 pt-1">
-                              {ans.attachments.map(att => (
-                                <button
-                                  key={att.id}
-                                  onClick={() => setPreviewAttachment(att)}
-                                  className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300"
-                                >
-                                  📎 {att.name}
-                                </button>
-                              ))}
+                              {ans.attachments.map(att => {
+                                const isImg = isImageFile(att.fileType, att.name || att.url);
+                                return isImg ? (
+                                  <button
+                                    key={att.id}
+                                    onClick={() => setPreviewAttachment(att)}
+                                    className="group relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-20 w-28 shadow-xs hover:border-indigo-500 transition-all shrink-0 active:scale-98"
+                                  >
+                                    <img
+                                      src={getProxiedUrl(att.url)}
+                                      alt={att.name}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-1.5 flex flex-col justify-end">
+                                      <span className="text-[8px] font-bold text-white truncate">{att.name}</span>
+                                    </div>
+                                  </button>
+                                ) : (
+                                  <button
+                                    key={att.id}
+                                    onClick={() => setPreviewAttachment(att)}
+                                    className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300"
+                                  >
+                                    📎 {att.name}
+                                  </button>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
@@ -1099,18 +1156,40 @@ export const QAView: React.FC<QAViewProps> = ({
             </div>
 
             <div className="p-6 flex-1 overflow-y-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
-              {previewAttachment.fileType === 'img' || previewAttachment.url.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+              {isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
                 <img
-                  src={getProxiedUrl(previewAttachment.url, true)}
+                  src={getProxiedUrl(previewAttachment.url)}
                   alt={previewAttachment.name}
                   className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
                 />
-              ) : (
+              ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
                 <iframe
-                  src={`https://docs.google.com/viewer?url=${encodeURIComponent(getProxiedUrl(previewAttachment.url, true))}&embedded=true`}
+                  src={getProxiedUrl(previewAttachment.url)}
                   className="w-full h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
                   title={previewAttachment.name}
                 />
+              ) : (
+                <div className="w-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-2xl font-black text-2xl">
+                    📄
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-800 dark:text-white text-sm truncate max-w-md">{previewAttachment.name}</h5>
+                    <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir Provider)</p>
+                  </div>
+                  <a
+                    href={getProxiedUrl(previewAttachment.url, true, previewAttachment.name)}
+                    download={previewAttachment.name}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    Unduh Berkas Langsung
+                  </a>
+                  <iframe
+                    src={`https://docs.google.com/viewer?url=${encodeURIComponent(getProxiedUrl(previewAttachment.url, true))}&embedded=true`}
+                    className="w-full h-[350px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white mt-2"
+                    title={previewAttachment.name}
+                  />
+                </div>
               )}
             </div>
           </div>

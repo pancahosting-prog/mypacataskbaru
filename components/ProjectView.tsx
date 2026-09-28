@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Project, ProjectFile, ProjectNote, ProjectFolderCategory } from '../types';
-import { getProxiedUrl } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
 
 interface ProjectViewProps {
   currentUser: {
@@ -1231,24 +1231,43 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
 
           {/* Viewer Stage */}
           <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
-            {previewFile.fileType.includes('image') || ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg'].includes(previewFile.name.split('.').pop()?.toLowerCase() || '') ? (
+            {isImageFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
               <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
-                  referrerPolicy="no-referrer"
-                  src={getProxiedUrl(previewFile.url, true)}
+                  src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
               </div>
-            ) : (
+            ) : isPdfFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
               <div className="w-full h-full relative flex flex-col justify-center items-center">
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400 z-0">
-                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen di Dalam Aplikasi via Google Viewer...</p>
+                <iframe
+                  src={getProxiedUrl(previewFile.url)}
+                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  title={previewFile.name}
+                />
+              </div>
+            ) : (
+              <div className="w-full h-full relative flex flex-col justify-center items-center p-6 text-center space-y-4">
+                <div className="p-4 bg-slate-800 rounded-2xl text-slate-300">
+                  {getFileIcon(previewFile.fileType, previewFile.name)}
+                </div>
+                <div>
+                  <h5 className="text-white font-bold text-sm truncate max-w-md">{previewFile.name}</h5>
+                  <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir ISP)</p>
+                </div>
+                <div className="flex gap-3 pt-2 z-20">
+                  <a
+                    href={getProxiedUrl(previewFile.url, true, previewFile.name)}
+                    download={previewFile.name}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    Unduh Berkas Langsung
+                  </a>
                 </div>
                 <iframe
                   src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
-                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  className="w-full h-[350px] border-0 relative z-10 rounded-2xl bg-white mt-2"
                   title="Google Document Viewer"
                 />
               </div>

@@ -30,3 +30,27 @@ export const getProxiedUrl = (
 
   return proxied;
 };
+
+export const isImageFile = (fileType?: string, fileNameOrUrl?: string): boolean => {
+  if (fileType) {
+    const ft = fileType.toLowerCase();
+    if (ft.includes('image') || ft === 'img' || ft === 'photo' || ft === 'picture') return true;
+  }
+  if (fileNameOrUrl) {
+    const clean = fileNameOrUrl.split('?')[0].toLowerCase();
+    if (/\.(jpeg|jpg|gif|png|webp|svg|bmp|ico|heic|tiff)$/i.test(clean)) return true;
+  }
+  return false;
+};
+
+export const isPdfFile = (fileType?: string, fileNameOrUrl?: string): boolean => {
+  if (fileType) {
+    const ft = fileType.toLowerCase();
+    if (ft.includes('pdf')) return true;
+  }
+  if (fileNameOrUrl) {
+    const clean = fileNameOrUrl.split('?')[0].toLowerCase();
+    if (/\.pdf$/i.test(clean)) return true;
+  }
+  return false;
+};

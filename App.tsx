@@ -63,6 +63,8 @@ const App: React.FC = () => {
   const [dayPickerDate, setDayPickerDate] = useState<Date | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isMenuDropdownOpen, setIsMenuDropdownOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   const [allUsers, setAllUsers] = useState<any[]>([]);
@@ -503,98 +505,219 @@ const App: React.FC = () => {
     );
   }
 
+  const getViewLabel = (v: string) => {
+    switch (v) {
+      case 'analytics': return 'Dashboard';
+      case 'list': return 'Tugas';
+      case 'month':
+      case 'week':
+      case 'day': return 'Kalender';
+      case 'drive': return 'Drive';
+      case 'project': return 'Project Database';
+      case 'qa': return 'Q&A Forum';
+      case 'assign': return 'Kirim Tugas';
+      case 'tracking': return 'Tracking Tugas';
+      case 'users': return 'User';
+      case 'messages': return 'Pesan';
+      default: return 'Dashboard';
+    }
+  };
+
   return (
-    <div className={`min-h-screen flex transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0F172A]' : 'bg-[#F0F2F5]'}`}>
-      <aside className={`${isSidebarCollapsed ? 'w-[64px]' : 'w-72'} bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col px-2 py-6 fixed lg:sticky left-0 top-0 h-screen transition-all z-[100]`}>
-        <div className="flex items-center mb-10 h-10 px-1 overflow-hidden">
-          <div className="flex items-center gap-3 shrink-0 lg:pl-2">
-            <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="w-10 h-10 bg-white border border-slate-100 rounded-lg flex items-center justify-center p-1 shadow-sm transition-all overflow-hidden shrink-0">
-              <img src="https://ahlifumigasi.com/wp-content/uploads/2025/12/logopancaapp.png" alt="Logo" className="w-full h-full object-contain" />
-            </button>
-            {!isSidebarCollapsed && (
-              <div className="flex flex-col gap-0">
-                <h1 className="text-lg font-bold text-slate-800 dark:text-white tracking-tight leading-none">MyPanca</h1>
-                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">smart assistant</p>
+    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${theme === 'dark' ? 'bg-[#0F172A]' : 'bg-[#F0F2F5]'}`}>
+      {/* Top Header Navigation Bar */}
+      <header className="sticky top-0 z-[150] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-xs px-4 sm:px-8 py-3">
+        <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
+          {/* Left: Brand Logo & Menu Navigation Dropdown */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <div className="flex items-center gap-3 shrink-0">
+              <img src="https://ahlifumigasi.com/wp-content/uploads/2025/12/logopancaapp.png" alt="Logo" className="w-9 h-9 object-contain" />
+              <div className="hidden sm:flex flex-col leading-none">
+                <h1 className="text-base font-black text-slate-800 dark:text-white tracking-tight">MyPanca</h1>
+                <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">smart assistant</p>
               </div>
-            )}
+            </div>
+
+            {/* Menu Dropdown Navigation Button */}
+            <div className="relative">
+              <button
+                onClick={() => setIsMenuDropdownOpen(!isMenuDropdownOpen)}
+                className="flex items-center gap-2.5 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 text-indigo-600 dark:text-indigo-300 rounded-2xl text-xs font-black uppercase tracking-wider transition-all border border-indigo-100 dark:border-indigo-800 active:scale-95 shadow-xs"
+              >
+                <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+                <span>Menu: {getViewLabel(view)}</span>
+                <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${isMenuDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+
+              {/* Menu Dropdown Panel */}
+              {isMenuDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-[190]" onClick={() => setIsMenuDropdownOpen(false)} />
+                  <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2.5 z-[200] animate-fade-in space-y-1 max-h-[80vh] overflow-y-auto">
+                    <div className="px-3 py-1.5 text-[9px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 dark:border-slate-800 mb-1">
+                      Pilih Menu Aplikasi
+                    </div>
+
+                    <button
+                      onClick={() => { setView('analytics'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'analytics' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                      <span>Dashboard</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setView('list'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'list' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg>
+                      <span>Tugas</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setView('month'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${['month', 'week', 'day'].includes(view) ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
+                      <span>Kalender</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setView('drive'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'drive' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" /></svg>
+                      <span>Drive</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setView('project'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'project' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                      <span>Project Database</span>
+                    </button>
+
+                    <button
+                      onClick={() => { setView('qa'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'qa' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.38 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.38 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+                      <span>Q&A Forum</span>
+                    </button>
+
+                    {currentUser.role === 'superadmin' && (
+                      <>
+                        <div className="px-3 pt-2 pb-1 text-[9px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100 dark:border-slate-800 mt-2">
+                          Menu Superadmin
+                        </div>
+                        <button
+                          onClick={() => { setView('assign'); setIsMenuDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'assign' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                          <span>Kirim Tugas</span>
+                        </button>
+                        <button
+                          onClick={() => { setView('tracking'); setIsMenuDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'tracking' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v4l2 2"/></svg>
+                          <span>Tracking Tugas</span>
+                        </button>
+                        <button
+                          onClick={() => { setView('users'); setIsMenuDropdownOpen(false); }}
+                          className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'users' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                        >
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 1 0 7.75"/></svg>
+                          <span>User Management</span>
+                        </button>
+                      </>
+                    )}
+
+                    <div className="px-3 pt-2 pb-1 text-[9px] font-black text-slate-400 uppercase tracking-widest border-t border-slate-100 dark:border-slate-800 mt-2">
+                      Lainnya
+                    </div>
+
+                    <button
+                      onClick={() => { setView('messages'); setIsMenuDropdownOpen(false); }}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all ${view === 'messages' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span>Pesan</span>
+                      {unreadCount > 0 && (
+                        <span className="ml-auto px-2 py-0.5 bg-rose-500 text-white text-[9px] font-black rounded-full">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      onClick={() => { setIsAboutOpen(true); setIsMenuDropdownOpen(false); }}
+                      className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+                      <span>Tentang Aplikasi</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          {/* Right: Quick Messages & User Profile Dropdown */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setView('messages')}
+              className={`p-2.5 rounded-2xl border transition-all relative ${view === 'messages' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100'}`}
+              title="Kotak Masuk Pesan"
+            >
+              <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 bg-rose-500 rounded-full border-2 border-white animate-pulse" />
+              )}
+            </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                className="flex items-center gap-2.5 p-1.5 pr-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-2xl border border-slate-200 dark:border-slate-700 transition-all active:scale-95"
+              >
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                  {currentUser.name.charAt(0)}
+                </div>
+                <div className="hidden sm:flex flex-col text-left leading-tight">
+                  <span className="text-xs font-bold text-slate-800 dark:text-white truncate max-w-[120px]">{currentUser.name}</span>
+                  <span className="text-[9px] text-slate-400 font-bold uppercase">{currentUser.role}</span>
+                </div>
+                <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${isUserDropdownOpen ? 'rotate-180' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+
+              {isUserDropdownOpen && (
+                <>
+                  <div className="fixed inset-0 z-[190]" onClick={() => setIsUserDropdownOpen(false)} />
+                  <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 p-2 z-[200] animate-fade-in space-y-1">
+                    <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 mb-1">
+                      <p className="text-xs font-bold text-slate-800 dark:text-white">{currentUser.name}</p>
+                      <p className="text-[10px] text-slate-400 font-semibold uppercase">@{currentUser.username} • {currentUser.role}</p>
+                    </div>
+
+                    <button
+                      onClick={() => { setCurrentUser(null); setIsUserDropdownOpen(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/50 transition-all"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                      <span>Keluar / Logout</span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
-        
-        <div className="flex-1 overflow-y-auto no-scrollbar">
-          <nav className="space-y-2">
-            <button onClick={() => setView('analytics')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'analytics' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg></div>
-              {!isSidebarCollapsed && <span>Dashboard</span>}
-            </button>
-            <button onClick={() => setView('list')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'list' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="m9 12 2 2 4-4"/></svg></div>
-              {!isSidebarCollapsed && <span>Tugas</span>}
-            </button>
-            <button onClick={() => setView('month')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${['month', 'week', 'day'].includes(view) ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="3" x2="21" y1="10" y2="10"/></svg></div>
-              {!isSidebarCollapsed && <span>Kalender</span>}
-            </button>
-            <button onClick={() => setView('drive')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'drive' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-              </div>
-              {!isSidebarCollapsed && <span>Drive</span>}
-            </button>
-            <button onClick={() => setView('project')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'project' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
-              {!isSidebarCollapsed && <span>Project Database</span>}
-            </button>
-            <button onClick={() => setView('qa')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'qa' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-              <div className="w-6 flex justify-center">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.38 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.38 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
-                </svg>
-              </div>
-              {!isSidebarCollapsed && <span>Q&A Forum</span>}
-            </button>
-            {currentUser.role === 'superadmin' && (
-              <>
-                <button onClick={() => setView('assign')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'assign' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg></div>
-                  {!isSidebarCollapsed && <span>Kirim Tugas</span>}
-                </button>
-                <button onClick={() => setView('tracking')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'tracking' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/><path d="M11 8v4l2 2"/></svg></div>
-                  {!isSidebarCollapsed && <span>Tracking Tugas</span>}
-                </button>
-                <button onClick={() => setView('users')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'users' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'}`}>
-                  <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-                  {!isSidebarCollapsed && <span>User</span>}
-                </button>
-              </>
-            )}
-            <button onClick={() => setView('messages')} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all ${view === 'messages' ? 'bg-indigo-50 text-indigo-600' : 'text-slate-500 hover:bg-slate-50'} relative`}>
-              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>{unreadCount > 0 && <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-sm"></span>}</div>
-              {!isSidebarCollapsed && <span>Pesan</span>}
-            </button>
-            <button onClick={() => setIsAboutOpen(true)} className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-4'} py-3 rounded-xl text-sm font-medium transition-all text-slate-500 hover:bg-slate-50`}>
-              <div className="w-6 flex justify-center"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg></div>
-              {!isSidebarCollapsed && <span>Tentang</span>}
-            </button>
-          </nav>
-        </div>
+      </header>
 
-        <div className="pt-4 mt-auto border-t border-slate-100 px-2">
-           <button onClick={() => setCurrentUser(null)} className="w-full flex items-center justify-center p-3 rounded-xl text-rose-500 hover:bg-rose-50 mb-4 transition-all"><svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
-           <div className={`flex items-center ${isSidebarCollapsed ? 'justify-center' : 'gap-3 px-2'} py-2 bg-slate-50 rounded-2xl border border-slate-200`}>
-              <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">{currentUser.name.charAt(0)}</div>
-              {!isSidebarCollapsed && <div className="flex-1 min-w-0"><p className="text-xs font-bold text-slate-900 truncate">{currentUser.name}</p><p className="text-[9px] text-slate-400 uppercase font-bold">{currentUser.role}</p></div>}
-           </div>
-        </div>
-      </aside>
-
-      <main className={`flex-1 ${isSidebarCollapsed ? 'pl-20' : 'pl-80'} lg:pl-0 lg:ml-12 p-4 lg:p-14 flex flex-col gap-8 w-full max-w-screen-2xl transition-all relative`}>
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-8 py-6 sm:py-8 flex flex-col gap-6 relative">
         {isSyncing && (
           <div className="fixed top-6 right-6 z-[300] bg-white/80 backdrop-blur-md px-4 py-2 rounded-full border border-slate-100 shadow-lg flex items-center gap-3 animate-fade-in">
              <div className="w-4 h-4 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
@@ -602,11 +725,11 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <section className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-           <div><h2 className="text-2xl lg:text-4xl font-black text-slate-800 dark:text-white tracking-tight">Halo, {currentUser.name}!</h2></div>
-           <button onClick={() => setIsNoteOpen(true)} className="flex items-center gap-5 bg-amber-50 p-2.5 pr-6 rounded-2xl border border-amber-200 shadow-sm transition-all group active:scale-95">
-             <div className="w-10 h-10 bg-amber-400 rounded-xl flex items-center justify-center text-white shadow-md group-hover:rotate-12 transition-transform"><svg className="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
-             <div className="text-left"><p className="text-[11px] font-black text-amber-800 uppercase tracking-widest">Stickynote Pribadi</p></div>
+        <section className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 w-full">
+           <div><h2 className="text-3xl lg:text-4xl font-black text-slate-800 dark:text-white tracking-tight">Halo, {currentUser.name}!</h2></div>
+           <button onClick={() => setIsNoteOpen(true)} className="flex items-center gap-4 bg-amber-50/90 hover:bg-amber-100/80 p-2.5 pr-5 rounded-2xl border border-amber-200/80 shadow-xs transition-all group active:scale-95 shrink-0">
+             <div className="w-9 h-9 bg-amber-400 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:rotate-12 transition-transform shrink-0"><svg className="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/></svg></div>
+             <div className="text-left"><p className="text-[11px] font-black text-amber-900 uppercase tracking-wider">Stickynote Pribadi</p></div>
            </button>
         </section>
 
@@ -662,7 +785,7 @@ const App: React.FC = () => {
            )}
 
            {view === 'messages' && (
-             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+             <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full">
                 <div className="flex justify-between items-center mb-10">
                    <h3 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Kotak Masuk</h3>
                    <div className="flex gap-4">
@@ -682,7 +805,7 @@ const App: React.FC = () => {
            )}
 
            {view === 'users' && currentUser.role === 'superadmin' && (
-             <div className="p-8 lg:p-14 animate-fade-in space-y-10">
+             <div className="p-6 lg:p-10 animate-fade-in space-y-10">
                 <div className="bg-slate-50 dark:bg-slate-950 p-8 rounded-[32px] border border-slate-200 dark:border-slate-800">
                   <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-widest mb-6">Tambah User Baru</h3>
                   <form onSubmit={handleAddUser} className="grid grid-cols-1 md:grid-cols-5 gap-4">
@@ -769,7 +892,7 @@ const App: React.FC = () => {
            )}
 
            {view === 'assign' && currentUser.role === 'superadmin' && (
-             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+             <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full">
                 <div className="mb-10 flex flex-col md:flex-row justify-between items-end gap-6">
                   <div><h3 className="text-2xl font-black text-slate-800 tracking-tight">Penugasan Team</h3><p className="text-sm text-slate-400">Pilih user untuk menugaskan pekerjaan bersama.</p></div>
                   <div className="flex gap-4"><button onClick={() => setSelectedAssignees(allUsers.filter(u => u.username !== 'superadmin').map(u => u.username))} className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:bg-indigo-50 px-3 py-1.5 rounded-lg transition-all">Pilih Semua</button><button onClick={() => setSelectedAssignees([])} className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:bg-rose-50 px-3 py-1.5 rounded-lg transition-all">Hapus Semua</button></div>
@@ -798,17 +921,17 @@ const App: React.FC = () => {
            )}
 
            {view === 'tracking' && currentUser.role === 'superadmin' && (
-             <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full">
+             <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full">
                 <div className="mb-10 flex justify-between items-center"><div><h3 className="text-2xl font-black text-slate-800 tracking-tight">Tracking Per User</h3></div><select value={targetUser} onChange={e => { setTargetUser(e.target.value); if(e.target.value) fetchTargetTasks(e.target.value); }} className="p-4 bg-slate-50 border rounded-2xl font-bold text-sm outline-none w-80 focus:border-indigo-500 transition-all shadow-sm text-slate-800 dark:text-white dark:bg-slate-950 dark:border-slate-800"><option value="">Pilih User Untuk Track</option>{allUsers.filter(u => u.username !== 'superadmin').map(u => (<option key={u.username} value={u.username}>{u.name} (@{u.username})</option>))}</select></div>
                 {targetUser ? <ListView tasks={targetUserTasks} onTaskClick={(t) => handleOpenTask(t, t.logs.length - 1)} onDeleteTask={handleDeleteTask} onColorChange={() => {}} /> : <div className="flex-1 flex flex-col items-center justify-center py-20 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[40px] text-slate-400 uppercase font-black tracking-widest text-[10px]">Pilih user di atas untuk melihat laporan pekerjaan mereka</div>}
              </div>
            )}
 
            {['month', 'week', 'day'].includes(view) && (
-             <div className="px-8 lg:px-14 pt-10 pb-6"><CalendarHeader currentDate={currentDate} view={view as CalendarViewType} setView={setView} onPrev={() => changeDate(-1)} onNext={() => changeDate(1)} onToday={() => setCurrentDate(new Date())} /></div>
+             <div className="px-6 lg:px-10 pt-8 pb-4"><CalendarHeader currentDate={currentDate} view={view as CalendarViewType} setView={setView} onPrev={() => changeDate(-1)} onNext={() => changeDate(1)} onToday={() => setCurrentDate(new Date())} /></div>
            )}
 
-           <div className="flex-1 p-8 lg:p-14 overflow-y-auto no-scrollbar">
+           <div className="flex-1 p-6 lg:p-10 overflow-y-auto no-scrollbar">
               {view === 'month' && <MonthView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
               {view === 'week' && <WeekView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}
               {view === 'day' && <DayView currentDate={currentDate} tasks={tasks} onDateClick={(d) => { setDayPickerDate(d); setIsDayPickerOpen(true); }} onTaskClick={handleOpenTask} />}

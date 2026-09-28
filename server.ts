@@ -36,7 +36,17 @@ async function startServer() {
         return res.status(response.status).send(`Failed to fetch file from remote source (${response.status})`);
       }
 
-      const contentType = response.headers.get('content-type') || 'application/octet-stream';
+      let contentType = response.headers.get('content-type') || '';
+      if (!contentType || contentType === 'application/octet-stream' || contentType.startsWith('text/html')) {
+        const checkTarget = (filename || fileUrl).split('?')[0].toLowerCase();
+        if (/\.(jpeg|jpg)$/i.test(checkTarget)) contentType = 'image/jpeg';
+        else if (/\.png$/i.test(checkTarget)) contentType = 'image/png';
+        else if (/\.gif$/i.test(checkTarget)) contentType = 'image/gif';
+        else if (/\.webp$/i.test(checkTarget)) contentType = 'image/webp';
+        else if (/\.svg$/i.test(checkTarget)) contentType = 'image/svg+xml';
+        else if (/\.pdf$/i.test(checkTarget)) contentType = 'application/pdf';
+        else contentType = contentType || 'application/octet-stream';
+      }
       const contentLength = response.headers.get('content-length');
 
       res.setHeader('Content-Type', contentType);

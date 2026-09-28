@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrivePost, DriveAttachment } from '../types';
 import { supabaseService } from '../services/supabaseService';
-import { getProxiedUrl } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile } from '../services/proxyService';
 
 interface DriveViewProps {
   currentUser: {
@@ -412,7 +412,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   };
 
   return (
-    <div className="p-8 lg:p-14 animate-fade-in flex flex-col h-full space-y-10">
+    <div className="p-6 lg:p-10 animate-fade-in flex flex-col h-full space-y-10">
       {/* HEADER BAR */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
@@ -698,31 +698,47 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                     {/* ATTACHMENT TILES */}
                     {post.attachments && post.attachments.length > 0 && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                        {post.attachments.map((file, fIdx) => (
-                          <button
-                            key={fIdx}
-                            onClick={() => setPreviewFile(file)}
-                            className="flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 hover:border-indigo-200 hover:bg-white dark:hover:bg-slate-950 transition-all text-left w-full active:scale-98"
-                          >
-                            <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-sm shrink-0">
-                              {getFileIcon(file.fileType, file.name)}
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate leading-tight" title={file.name}>
-                                {file.name}
-                              </p>
-                              <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-none">
-                                {formatBytes(file.size)}
-                              </p>
-                            </div>
-                            <div className="text-slate-300 hover:text-indigo-600 shrink-0">
-                              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                                <circle cx="12" cy="12" r="3" />
-                              </svg>
-                            </div>
-                          </button>
-                        ))}
+                        {post.attachments.map((file, fIdx) => {
+                          const isImg = isImageFile(file.fileType, file.name || file.url);
+                          return (
+                            <button
+                              key={fIdx}
+                              onClick={() => setPreviewFile(file)}
+                              className="group flex flex-col p-3 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/30 hover:border-indigo-300 hover:bg-white dark:hover:bg-slate-950 transition-all text-left w-full active:scale-98 overflow-hidden shadow-xs"
+                            >
+                              {isImg && (
+                                <div className="w-full h-40 bg-slate-900 rounded-xl overflow-hidden mb-2.5 relative flex items-center justify-center border border-slate-200 dark:border-slate-800">
+                                  <img
+                                    src={getProxiedUrl(file.url)}
+                                    alt={file.name}
+                                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                    loading="lazy"
+                                  />
+                                  <div className="absolute inset-0 bg-slate-950/20 group-hover:bg-transparent transition-all" />
+                                </div>
+                              )}
+                              <div className="flex items-center gap-3 w-full">
+                                <div className="p-2 bg-white dark:bg-slate-900 rounded-xl shadow-xs shrink-0">
+                                  {getFileIcon(file.fileType, file.name)}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-black text-slate-700 dark:text-slate-200 truncate leading-tight" title={file.name}>
+                                    {file.name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1 leading-none">
+                                    {formatBytes(file.size)}
+                                  </p>
+                                </div>
+                                <div className="text-slate-300 group-hover:text-indigo-600 shrink-0">
+                                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    <circle cx="12" cy="12" r="3" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -884,24 +900,43 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
 
           {/* Viewer Stage */}
           <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
-            {previewFile.fileType.startsWith('image/') ? (
+            {isImageFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
               <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
-                  referrerPolicy="no-referrer"
-                  src={getProxiedUrl(previewFile.url, true)}
+                  src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
                   className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
               </div>
-            ) : (
+            ) : isPdfFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
               <div className="w-full h-full relative flex flex-col justify-center items-center">
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-400 z-0">
-                  <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-                  <p className="text-[10px] font-black uppercase tracking-wider">Memuat Dokumen via Google Engine...</p>
+                <iframe
+                  src={getProxiedUrl(previewFile.url)}
+                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  title={previewFile.name}
+                />
+              </div>
+            ) : (
+              <div className="w-full h-full relative flex flex-col justify-center items-center p-6 text-center space-y-4">
+                <div className="p-4 bg-slate-800 rounded-2xl text-slate-300">
+                  {getFileIcon(previewFile.fileType, previewFile.name)}
+                </div>
+                <div>
+                  <h5 className="text-white font-bold text-sm truncate max-w-md">{previewFile.name}</h5>
+                  <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir ISP)</p>
+                </div>
+                <div className="flex gap-3 pt-2 z-20">
+                  <a
+                    href={getProxiedUrl(previewFile.url, true, previewFile.name)}
+                    download={previewFile.name}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    Unduh Berkas Langsung
+                  </a>
                 </div>
                 <iframe
                   src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
-                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  className="w-full h-[350px] border-0 relative z-10 rounded-2xl bg-white mt-2"
                   title="Google Document Viewer"
                 />
               </div>
