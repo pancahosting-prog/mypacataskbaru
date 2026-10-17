@@ -873,9 +873,10 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
 
       {/* PREVIEW MODAL */}
       {previewFile && (
-        <div className="fixed inset-0 z-[200] flex flex-col justify-between p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-          {/* Header */}
-          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 md:px-6 rounded-3xl shadow-xl w-full max-w-5xl mx-auto mb-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/90 backdrop-blur-sm animate-fade-in overflow-hidden">
+          <div className="bg-slate-900 w-full max-w-6xl rounded-[24px] sm:rounded-[32px] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-slate-800 flex flex-col h-full max-h-[92vh] relative overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between bg-slate-900 border-b border-slate-800 p-4 md:px-6 shrink-0">
             <div className="flex items-center gap-3 min-w-0">
               <div className="p-2 bg-slate-800 rounded-xl shrink-0">
                 {getFileIcon(previewFile.fileType, previewFile.name)}
@@ -929,24 +930,22 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
           </div>
 
           {/* Viewer Stage */}
-          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
+          <div className="flex-1 bg-slate-950 overflow-hidden relative w-full flex flex-col items-center justify-center p-0">
             {isImageFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
-              <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
+              <div className="w-full h-full p-4 sm:p-8 flex items-center justify-center">
                 <img
                   src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
                   onError={(e) => handleImageError(e, previewFile.url)}
-                  className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
+                  className="max-h-full w-auto object-contain rounded-xl shadow-2xl border border-slate-700 bg-slate-900"
                 />
               </div>
             ) : isPdfFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
-              <div className="w-full h-full relative flex flex-col justify-center items-center">
-                <iframe
-                  src={getProxiedUrl(previewFile.url)}
-                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
-                  title={previewFile.name}
-                />
-              </div>
+              <iframe
+                src={getProxiedUrl(previewFile.url)}
+                className="w-full h-full border-none bg-white"
+                title={previewFile.name}
+              />
             ) : isDocxFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
               <DocxViewer
                 url={previewFile.url}
@@ -956,18 +955,21 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                 isDownloading={isDownloadingFile}
               />
             ) : (
-              <GenericFileViewer
-                url={previewFile.url}
-                filename={previewFile.name}
-                fileType={previewFile.fileType}
-                size={previewFile.size}
-                onDownload={() => handleDownloadFile(previewFile)}
-                isDownloading={isDownloadingFile}
-              />
+              <div className="w-full h-full p-4 sm:p-8 flex items-center justify-center">
+                <GenericFileViewer
+                  url={previewFile.url}
+                  filename={previewFile.name}
+                  fileType={previewFile.fileType}
+                  size={previewFile.size}
+                  onDownload={() => handleDownloadFile(previewFile)}
+                  isDownloading={isDownloadingFile}
+                />
+              </div>
             )}
           </div>
         </div>
-      )}
+      </div>
+    )}
     </div>
   );
 };

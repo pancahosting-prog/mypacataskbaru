@@ -1384,9 +1384,9 @@ export const QAView: React.FC<QAViewProps> = ({
       {previewAttachment && (() => {
         const isDocx = isDocxFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url);
         return (
-          <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
-              <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-2 sm:p-4 md:p-6 overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[24px] sm:rounded-[32px] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-800 flex flex-col h-full max-h-[92vh] relative overflow-hidden">
+              <div className="p-3 sm:p-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`px-2.5 py-1 rounded-xl font-black text-xs uppercase shrink-0 shadow-2xs ${
                     isDocx
