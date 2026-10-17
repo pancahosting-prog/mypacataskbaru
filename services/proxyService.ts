@@ -179,7 +179,7 @@ export const downloadFile = async (url: string, filename: string): Promise<boole
   }
 
   // 3. Remote URL via proxy endpoint with Blob download
-  const proxied = getProxiedUrl(url, false, safeFilename);
+  const proxied = getProxiedUrl(url, true, safeFilename);
   try {
     const res = await fetch(proxied);
     if (res.ok) {

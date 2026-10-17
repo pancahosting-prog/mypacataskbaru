@@ -56,7 +56,7 @@ export const GenericFileViewer: React.FC<GenericFileViewerProps> = ({
   const info = getFileBadgeAndIcon();
 
   return (
-    <div className="w-full flex-1 min-h-[380px] flex flex-col items-center justify-center p-8 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-5">
+    <div className="w-full flex-1 min-h-[300px] flex flex-col items-center justify-center p-4 sm:p-8 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 text-center space-y-5">
       <div className={`w-20 h-20 rounded-3xl flex items-center justify-center text-4xl shadow-inner border ${info.bg}`}>
         {info.icon}
       </div>

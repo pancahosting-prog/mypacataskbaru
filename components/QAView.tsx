@@ -1443,37 +1443,45 @@ export const QAView: React.FC<QAViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 sm:p-5 flex-1 overflow-y-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+              <div className={`p-0 flex-1 overflow-hidden flex flex-col bg-slate-100 dark:bg-slate-950 ${
+                isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url)
+                  ? 'items-center justify-center p-4 sm:p-8'
+                  : ''
+              }`}>
                 {isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
                   <img
                     src={getProxiedUrl(previewAttachment.url)}
                     alt={previewAttachment.name}
                     onError={(e) => handleImageError(e, previewAttachment.url)}
-                    className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
+                    className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800"
                   />
                 ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
                   <iframe
                     src={getProxiedUrl(previewAttachment.url)}
-                    className="w-full h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
+                    className="w-full h-full border-none bg-white"
                     title={previewAttachment.name}
                   />
                 ) : isDocx ? (
-                  <DocxViewer
-                    url={previewAttachment.url}
-                    filename={previewAttachment.name}
-                    size={previewAttachment.size}
-                    onDownload={() => handleDownloadAttachment(previewAttachment)}
-                    isDownloading={isDownloadingAttachment}
-                  />
+                  <div className="w-full h-full flex flex-col">
+                    <DocxViewer
+                      url={previewAttachment.url}
+                      filename={previewAttachment.name}
+                      size={previewAttachment.size}
+                      onDownload={() => handleDownloadAttachment(previewAttachment)}
+                      isDownloading={isDownloadingAttachment}
+                    />
+                  </div>
                 ) : (
-                  <GenericFileViewer
-                    url={previewAttachment.url}
-                    filename={previewAttachment.name}
-                    fileType={previewAttachment.fileType}
-                    size={previewAttachment.size}
-                    onDownload={() => handleDownloadAttachment(previewAttachment)}
-                    isDownloading={isDownloadingAttachment}
-                  />
+                  <div className="w-full h-full flex flex-col p-4 sm:p-8 items-center justify-center">
+                    <GenericFileViewer
+                      url={previewAttachment.url}
+                      filename={previewAttachment.name}
+                      fileType={previewAttachment.fileType}
+                      size={previewAttachment.size}
+                      onDownload={() => handleDownloadAttachment(previewAttachment)}
+                      isDownloading={isDownloadingAttachment}
+                    />
+                  </div>
                 )}
               </div>
             </div>

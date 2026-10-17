@@ -119,17 +119,18 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
 
         // Import and render using docx-preview
         const { renderAsync } = await import('docx-preview');
-        await renderAsync(buffer, containerRef.current, undefined, {
+        await renderAsync(buffer, containerRef.current, containerRef.current, {
           className: 'docx',
           inWrapper: true,
           breakPages: true,
-          ignoreWidth: false,
-          ignoreHeight: false,
+          ignoreWidth: true,
+          ignoreHeight: true,
           renderHeaders: true,
           renderFooters: true,
           renderFootnotes: true,
           renderEndnotes: true,
           useBase64URL: true,
+          experimental: true,
         });
 
         // Count rendered pages
@@ -158,8 +159,12 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
     };
   }, [url]);
 
+  // If there's an error and it's not a 'legacy .doc' error, 
+  // we could potentially show GenericFileViewer as a fallback instead of just error card.
+  // But for now let's stick to the improved error card.
+
   return (
-    <div className="w-full flex flex-col items-center justify-start h-full">
+    <div className="w-full flex flex-col items-center justify-start h-full overflow-hidden">
       {/* Top Toolbar */}
       <div className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3 bg-slate-100 dark:bg-slate-800/90 rounded-2xl mb-3 border border-slate-200/90 dark:border-slate-700/80 shadow-xs">
         <div className="flex items-center gap-2.5 min-w-0">
@@ -189,20 +194,25 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
             <div className="flex items-center bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-1 gap-1 shadow-xs">
               <button
                 type="button"
-                onClick={() => setPageScale(prev => Math.max(0.6, Number((prev - 0.1).toFixed(1))))}
-                className="w-7 h-7 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-sm font-bold transition-all active:scale-90"
-                title="Perkecil Ukuran Tampilan (Zoom Out)"
+                onClick={() => setPageScale(prev => Math.max(0.4, Number((prev - 0.1).toFixed(1))))}
+                className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-lg font-bold transition-all active:scale-90"
+                title="Perkecil Ukuran (Zoom Out)"
               >
                 −
               </button>
-              <span className="text-[10px] font-black px-1.5 text-slate-600 dark:text-slate-300 min-w-[42px] text-center select-none">
-                {Math.round(pageScale * 100)}%
-              </span>
               <button
                 type="button"
-                onClick={() => setPageScale(prev => Math.min(1.6, Number((prev + 0.1).toFixed(1))))}
-                className="w-7 h-7 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-sm font-bold transition-all active:scale-90"
-                title="Perbesar Ukuran Tampilan (Zoom In)"
+                onClick={() => setPageScale(1)}
+                className="text-[10px] font-black px-2 py-1 text-slate-500 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/40 rounded-md transition-all min-w-[48px] text-center"
+                title="Kembalikan ke Ukuran Normal (100%)"
+              >
+                {Math.round(pageScale * 100)}%
+              </button>
+              <button
+                type="button"
+                onClick={() => setPageScale(prev => Math.min(1.8, Number((prev + 0.1).toFixed(1))))}
+                className="w-8 h-8 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-lg font-bold transition-all active:scale-90"
+                title="Perbesar Ukuran (Zoom In)"
               >
                 +
               </button>
@@ -239,7 +249,7 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
       </div>
 
       {/* Main Document Canvas Viewport */}
-      <div className="w-full flex-1 min-h-[420px] max-h-[75vh] overflow-y-auto relative bg-slate-200/80 dark:bg-slate-950 p-3 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col items-center custom-scrollbar">
+      <div className="w-full flex-1 overflow-y-auto relative bg-slate-200/80 dark:bg-slate-950 p-3 sm:p-6 rounded-b-2xl border-x border-b border-slate-200 dark:border-slate-800 flex flex-col items-center custom-scrollbar">
         {/* Loading Spinner State */}
         {isLoading && (
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center p-8 bg-slate-50/95 dark:bg-slate-950/95 backdrop-blur-xs rounded-2xl text-center space-y-4">
@@ -352,6 +362,9 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
         .mypanca-docx-preview-root section.docx table {
           border-collapse: collapse !important;
           margin: 0.75em 0 !important;
+          max-width: 100% !important;
+          overflow-x: auto !important;
+          display: block !important;
         }
       `}</style>
     </div>
