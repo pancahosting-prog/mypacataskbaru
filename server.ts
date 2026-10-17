@@ -37,36 +37,48 @@ async function startServer() {
       }
 
       let contentType = response.headers.get('content-type') || '';
-      if (!contentType || contentType === 'application/octet-stream' || contentType.startsWith('text/html')) {
-        const checkTarget = (filename || fileUrl).split('?')[0].toLowerCase();
-        if (/\.(jpeg|jpg)$/i.test(checkTarget)) contentType = 'image/jpeg';
-        else if (/\.png$/i.test(checkTarget)) contentType = 'image/png';
-        else if (/\.gif$/i.test(checkTarget)) contentType = 'image/gif';
-        else if (/\.webp$/i.test(checkTarget)) contentType = 'image/webp';
-        else if (/\.svg$/i.test(checkTarget)) contentType = 'image/svg+xml';
-        else if (/\.pdf$/i.test(checkTarget)) contentType = 'application/pdf';
-        else contentType = contentType || 'application/octet-stream';
+      const checkTarget = (filename || fileUrl).split('?')[0].toLowerCase();
+      
+      // Override or infer MIME type based on extension
+      if (/\.(jpeg|jpg)$/i.test(checkTarget)) contentType = 'image/jpeg';
+      else if (/\.png$/i.test(checkTarget)) contentType = 'image/png';
+      else if (/\.gif$/i.test(checkTarget)) contentType = 'image/gif';
+      else if (/\.webp$/i.test(checkTarget)) contentType = 'image/webp';
+      else if (/\.svg$/i.test(checkTarget)) contentType = 'image/svg+xml';
+      else if (/\.pdf$/i.test(checkTarget)) contentType = 'application/pdf';
+      else if (/\.docx$/i.test(checkTarget)) contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      else if (/\.doc$/i.test(checkTarget)) contentType = 'application/msword';
+      else if (/\.xlsx$/i.test(checkTarget)) contentType = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      else if (/\.xls$/i.test(checkTarget)) contentType = 'application/vnd.ms-excel';
+      else if (/\.pptx$/i.test(checkTarget)) contentType = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+      else if (/\.ppt$/i.test(checkTarget)) contentType = 'application/vnd.ms-powerpoint';
+      else if (/\.csv$/i.test(checkTarget)) contentType = 'text/csv';
+      else if (/\.txt$/i.test(checkTarget)) contentType = 'text/plain';
+      else if (/\.json$/i.test(checkTarget)) contentType = 'application/json';
+      else if (/\.zip$/i.test(checkTarget)) contentType = 'application/zip';
+      else if (!contentType || contentType === 'application/octet-stream' || contentType.startsWith('text/html')) {
+        contentType = 'application/octet-stream';
       }
-      const contentLength = response.headers.get('content-length');
 
       res.setHeader('Content-Type', contentType);
-      if (contentLength) res.setHeader('Content-Length', contentLength);
       res.setHeader('Cache-Control', 'public, max-age=86400');
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
       res.setHeader('Access-Control-Allow-Headers', '*');
+      res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition, Content-Length, Content-Type');
 
-      if (download || filename) {
+      if (download) {
         let safeName = filename;
         if (!safeName) {
           try {
             const urlObj = new URL(fileUrl);
             safeName = path.basename(urlObj.pathname);
           } catch (e) {
-            safeName = 'download';
+            safeName = 'berkas';
           }
         }
-        res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(safeName || 'file')}"`);
+        const cleanName = (safeName || 'berkas').replace(/["\\]/g, '');
+        res.setHeader('Content-Disposition', `attachment; filename="${cleanName}"; filename*=UTF-8''${encodeURIComponent(cleanName)}`);
       }
 
       const arrayBuffer = await response.arrayBuffer();

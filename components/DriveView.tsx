@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { DrivePost, DriveAttachment } from '../types';
 import { supabaseService } from '../services/supabaseService';
-import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
+import { getProxiedUrl, isImageFile, isPdfFile, isDocxFile, handleImageError, downloadFile } from '../services/proxyService';
+import { DocxViewer } from './DocxViewer';
+import { GenericFileViewer } from './GenericFileViewer';
 
 interface DriveViewProps {
   currentUser: {
@@ -34,8 +36,24 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [shareUnit, setShareUnit] = useState<'hours' | 'days' | 'weeks'>('hours');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
-  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string; size?: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDownloadingFile, setIsDownloadingFile] = useState(false);
+
+  const handleDownloadFile = async (file: { url: string; name: string }) => {
+    setIsDownloadingFile(true);
+    try {
+      const ok = await downloadFile(file.url, file.name);
+      if (!ok) {
+        alert('Gagal mengunduh berkas. Silakan coba lagi atau buka tautan sumber.');
+      }
+    } catch (err) {
+      console.error('Download error:', err);
+      alert('Terjadi kesalahan saat mengunduh berkas.');
+    } finally {
+      setIsDownloadingFile(false);
+    }
+  };
 
   useEffect(() => {
     // Load ImageKit settings from environment variables first, then fallback to localStorage
@@ -871,21 +889,32 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Unduh button in header */}
-              <a
-                href={getProxiedUrl(previewFile.url, true, previewFile.name)}
-                download={previewFile.name}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
+              <button
+                type="button"
+                onClick={() => handleDownloadFile(previewFile)}
+                disabled={isDownloadingFile}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 disabled:opacity-50"
+                title="Unduh Berkas ke Perangkat"
               >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                Unduh
-              </a>
+                {isDownloadingFile ? (
+                  <>
+                    <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <span>Mengunduh...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Unduh</span>
+                  </>
+                )}
+              </button>
 
               {/* Close Button */}
               <button
@@ -918,36 +947,24 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
                   title={previewFile.name}
                 />
               </div>
+            ) : isDocxFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
+              <DocxViewer
+                url={previewFile.url}
+                filename={previewFile.name}
+                size={previewFile.size}
+                onDownload={() => handleDownloadFile(previewFile)}
+                isDownloading={isDownloadingFile}
+              />
             ) : (
-              <div className="w-full h-full relative flex flex-col justify-center items-center p-6 text-center space-y-4">
-                <div className="p-4 bg-slate-800 rounded-2xl text-slate-300">
-                  {getFileIcon(previewFile.fileType, previewFile.name)}
-                </div>
-                <div>
-                  <h5 className="text-white font-bold text-sm truncate max-w-md">{previewFile.name}</h5>
-                  <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir ISP)</p>
-                </div>
-                <div className="flex gap-3 pt-2 z-20">
-                  <a
-                    href={getProxiedUrl(previewFile.url, true, previewFile.name)}
-                    download={previewFile.name}
-                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
-                  >
-                    Unduh Berkas Langsung
-                  </a>
-                </div>
-                <iframe
-                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
-                  className="w-full h-[350px] border-0 relative z-10 rounded-2xl bg-white mt-2"
-                  title="Google Document Viewer"
-                />
-              </div>
+              <GenericFileViewer
+                url={previewFile.url}
+                filename={previewFile.name}
+                fileType={previewFile.fileType}
+                size={previewFile.size}
+                onDownload={() => handleDownloadFile(previewFile)}
+                isDownloading={isDownloadingFile}
+              />
             )}
-          </div>
-
-          {/* Footer inside modal */}
-          <div className="text-center text-[8px] font-black text-slate-600 uppercase tracking-widest pt-4">
-            Didukung oleh Google Docs Viewer Engine
           </div>
         </div>
       )}
