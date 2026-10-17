@@ -68,6 +68,7 @@ export const QAView: React.FC<QAViewProps> = ({
   const [answerAttachments, setAnswerAttachments] = useState<QAAttachment[]>([]);
   const [isUploadingAnswerFile, setIsUploadingAnswerFile] = useState(false);
   const [answerUploadError, setAnswerUploadError] = useState('');
+  const [useBase64Mode, setUseBase64Mode] = useState(true); // Default to true to bypass ISP blocking
 
   // Edit Answer Form State
   const [editAnswerContent, setEditAnswerContent] = useState('');
@@ -171,25 +172,32 @@ export const QAView: React.FC<QAViewProps> = ({
         let fileUrl = '';
         let fileSize = file.size;
 
-        // Try ImageKit upload first if configured
-        const envUrl = (import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || '').trim();
-        const envPublic = (import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
-        const envPrivate = (import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '').trim();
-        const ikUrl = envUrl || localStorage.getItem('mypanca_imagekit_url') || '';
-        const ikPublic = envPublic || localStorage.getItem('mypanca_imagekit_public') || '';
-        const ikPrivate = envPrivate || localStorage.getItem('mypanca_imagekit_private') || '';
+        // Limit Base64 size to 10MB to prevent database issues
+        if (fileSize > 10 * 1024 * 1024) {
+          throw new Error(`Berkas "${file.name}" terlalu besar (Max 10MB). Kurangi ukuran berkas atau gunakan link eksternal.`);
+        }
 
-        if (ikUrl && ikPublic && ikPrivate) {
-          try {
-            const res = await uploadToImageKit(file);
-            fileUrl = res.url;
-            fileSize = res.size || file.size;
-          } catch (uploadErr: any) {
-            console.warn('ImageKit upload failed, falling back to local storage:', uploadErr);
+        // Try ImageKit upload first ONLY if Base64 mode is OFF
+        if (!useBase64Mode) {
+          const envUrl = (import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || '').trim();
+          const envPublic = (import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
+          const envPrivate = (import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '').trim();
+          const ikUrl = envUrl || localStorage.getItem('mypanca_imagekit_url') || '';
+          const ikPublic = envPublic || localStorage.getItem('mypanca_imagekit_public') || '';
+          const ikPrivate = envPrivate || localStorage.getItem('mypanca_imagekit_private') || '';
+
+          if (ikUrl && ikPublic && ikPrivate) {
+            try {
+              const res = await uploadToImageKit(file);
+              fileUrl = res.url;
+              fileSize = res.size || file.size;
+            } catch (uploadErr: any) {
+              console.warn('ImageKit upload failed, falling back to local storage:', uploadErr);
+            }
           }
         }
 
-        // Fallback: Read as Data URL (instant, local, 100% reliable)
+        // Fallback or Primary: Read as Data URL (Base64) - This bypasses ISP blocking!
         if (!fileUrl) {
           fileUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
@@ -1015,12 +1023,13 @@ export const QAView: React.FC<QAViewProps> = ({
                 </div>
 
                 {/* Upload Image / File via ImageKit */}
-                <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Lampirkan Gambar / Berkas (ImageKit Proxy)</label>
+                <div className="space-y-4 pt-2">
+
+
                   <div className="flex items-center gap-3">
-                    <label className="cursor-pointer px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-all flex items-center gap-2">
+                    <label className="cursor-pointer px-4 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-xs">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      <span>{isUploadingAskFile ? 'Mengunggah ke ImageKit...' : 'Pilih Gambar/File'}</span>
+                      <span>{isUploadingAskFile ? 'Memproses Berkas...' : 'Pilih Gambar/File'}</span>
                       <input
                         type="file"
                         multiple

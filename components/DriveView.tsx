@@ -39,6 +39,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string; size?: number } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isDownloadingFile, setIsDownloadingFile] = useState(false);
+  const [useBase64Mode, setUseBase64Mode] = useState(true); // Default to true for Netlify/ISP block reliability
 
   const handleDownloadFile = async (file: { url: string; name: string }) => {
     setIsDownloadingFile(true);
@@ -86,7 +87,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const filesArr = Array.from(e.target.files);
+      const filesArr = Array.from(e.target.files) as File[];
       setSelectedFiles(prev => [...prev, ...filesArr]);
       
       const newProgress = { ...uploadProgress };
@@ -110,7 +111,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filesArr = Array.from(e.dataTransfer.files);
+      const filesArr = Array.from(e.dataTransfer.files) as File[];
       setSelectedFiles(prev => [...prev, ...filesArr]);
       
       const newProgress = { ...uploadProgress };
@@ -208,26 +209,50 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    if (selectedFiles.length > 0 && (!ikUrl || !ikPublic || !ikPrivate)) {
-      setErrorMessage('Ada file yang dipilih, tetapi konfigurasi ImageKit belum lengkap di environment variables (VITE_IMAGEKIT_URL_ENDPOINT, VITE_IMAGEKIT_PUBLIC_KEY, VITE_IMAGEKIT_PRIVATE_KEY).');
-      return;
-    }
+
 
     setIsPublishing(true);
     setErrorMessage('');
     const uploadedAttachments: DriveAttachment[] = [];
 
     try {
-      // Upload each file to ImageKit
+      // Upload each file to ImageKit or convert to Base64
       for (const file of selectedFiles) {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
         try {
-          const attachment = await uploadToImageKit(file);
+          let attachment: DriveAttachment;
+
+          // Limit Base64 size to 10MB
+          if (file.size > 10 * 1024 * 1024) {
+             throw new Error(`Berkas "${file.name}" terlalu besar (Max 10MB).`);
+          }
+
+          if (useBase64Mode) {
+            // Read as Data URL (Base64) - Bypass ISP Block!
+            const dataUrl = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result as string);
+              reader.onerror = () => reject(new Error('Gagal membaca berkas.'));
+              reader.readAsDataURL(file);
+            });
+
+            attachment = {
+              name: file.name,
+              url: dataUrl,
+              fileType: file.type || 'application/octet-stream',
+              fileId: `b64_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+              size: file.size
+            };
+          } else {
+            // Standard ImageKit upload
+            attachment = await uploadToImageKit(file);
+          }
+
           uploadedAttachments.push(attachment);
           setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
         } catch (uploadErr: any) {
           setUploadProgress(prev => ({ ...prev, [file.name]: 'error' }));
-          throw new Error(`Gagal mengunggah file "${file.name}": ${uploadErr.message}`);
+          throw new Error(`Gagal memproses berkas "${file.name}": ${uploadErr.message}`);
         }
       }
 
@@ -435,28 +460,9 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Panca Drive</h3>
-          <p className="text-sm text-slate-400">Bagikan postingan, lampirkan berbagai tipe file, dan buat link akses temporary via ImageKit.</p>
+          <p className="text-sm text-slate-400">Bagikan postingan, lampirkan berbagai tipe file, dan buat link akses temporary.</p>
         </div>
       </div>
-
-      {/* WARNING IF NO IMAGEKIT */}
-      {!ikUrl && (
-        <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex items-start gap-3">
-            <svg className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-            <div>
-              <p className="font-bold text-amber-900">Upload Lampiran Memerlukan Konfigurasi Env ImageKit</p>
-              <p className="text-xs text-amber-700">
-                Silakan isi environment variables <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_URL_ENDPOINT</code>, <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PUBLIC_KEY</code>, dan <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PRIVATE_KEY</code> untuk mengaktifkan fitur upload lampiran.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* NEW POST FORM */}
       <div className="bg-slate-50 dark:bg-slate-900/40 p-8 rounded-[32px] border border-slate-200/80">
@@ -469,6 +475,8 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
         </h3>
 
         <form onSubmit={handlePublishPost} className="space-y-6">
+
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-4">
               <div>
