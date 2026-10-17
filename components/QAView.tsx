@@ -1385,8 +1385,8 @@ export const QAView: React.FC<QAViewProps> = ({
         const isDocx = isDocxFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url);
         return (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[90vh] max-h-[90vh] rounded-[28px] sm:rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
-              <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0">
+            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]">
+              <div className="p-4 sm:p-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
                 <div className="flex items-center gap-3 min-w-0">
                   <span className={`px-2.5 py-1 rounded-xl font-black text-xs uppercase shrink-0 shadow-2xs ${
                     isDocx
@@ -1443,43 +1443,37 @@ export const QAView: React.FC<QAViewProps> = ({
                 </div>
               </div>
 
-              <div className="p-3 sm:p-5 flex-1 overflow-y-auto flex flex-col items-center justify-start bg-slate-100 dark:bg-slate-950 w-full h-full">
+              <div className="p-3 sm:p-5 flex-1 overflow-y-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
                 {isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <img
-                      src={getProxiedUrl(previewAttachment.url)}
-                      alt={previewAttachment.name}
-                      onError={(e) => handleImageError(e, previewAttachment.url)}
-                      className="max-h-full max-w-full object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
-                    />
-                  </div>
+                  <img
+                    src={getProxiedUrl(previewAttachment.url)}
+                    alt={previewAttachment.name}
+                    onError={(e) => handleImageError(e, previewAttachment.url)}
+                    className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
+                  />
                 ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
                   <iframe
                     src={getProxiedUrl(previewAttachment.url)}
-                    className="w-full h-full rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
+                    className="w-full h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
                     title={previewAttachment.name}
                   />
                 ) : isDocx ? (
-                  <div className="w-full h-full flex flex-col">
-                    <DocxViewer
-                      url={previewAttachment.url}
-                      filename={previewAttachment.name}
-                      size={previewAttachment.size}
-                      onDownload={() => handleDownloadAttachment(previewAttachment)}
-                      isDownloading={isDownloadingAttachment}
-                    />
-                  </div>
+                  <DocxViewer
+                    url={previewAttachment.url}
+                    filename={previewAttachment.name}
+                    size={previewAttachment.size}
+                    onDownload={() => handleDownloadAttachment(previewAttachment)}
+                    isDownloading={isDownloadingAttachment}
+                  />
                 ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center">
-                    <GenericFileViewer
-                      url={previewAttachment.url}
-                      filename={previewAttachment.name}
-                      fileType={previewAttachment.fileType}
-                      size={previewAttachment.size}
-                      onDownload={() => handleDownloadAttachment(previewAttachment)}
-                      isDownloading={isDownloadingAttachment}
-                    />
-                  </div>
+                  <GenericFileViewer
+                    url={previewAttachment.url}
+                    filename={previewAttachment.name}
+                    fileType={previewAttachment.fileType}
+                    size={previewAttachment.size}
+                    onDownload={() => handleDownloadAttachment(previewAttachment)}
+                    isDownloading={isDownloadingAttachment}
+                  />
                 )}
               </div>
             </div>
