@@ -59,31 +59,51 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
           }
         }
 
-        // 3. If HTTP/HTTPS URL, try server proxy first, then direct URL
+        // 3. If HTTP/HTTPS URL, try direct fetch first or proxy with HTML detection
         if (!buffer && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('/'))) {
           let res: Response | null = null;
-          try {
-            const proxied = getProxiedUrl(url);
-            res = await fetch(proxied);
-          } catch (e) {
-            console.warn('Proxy fetch failed, attempting direct fetch:', e);
+          const direct = getDirectUrl(url);
+
+          // Try direct URL first if available (especially robust on static hosts like Netlify)
+          if (direct && direct !== url && !direct.includes('/api/proxy-file')) {
+            try {
+              res = await fetch(direct);
+            } catch (dirErr) {
+              console.warn('Direct URL fetch failed:', dirErr);
+            }
           }
 
+          // If direct fetch didn't succeed, try proxy
           if (!res || !res.ok) {
-            const direct = getDirectUrl(url);
-            if (direct && direct !== url) {
-              try {
-                res = await fetch(direct);
-              } catch (directErr) {
-                console.warn('Direct fetch error:', directErr);
+            try {
+              const proxied = getProxiedUrl(url);
+              const proxyRes = await fetch(proxied);
+              if (proxyRes.ok) {
+                const ct = proxyRes.headers.get('content-type') || '';
+                if (!ct.includes('text/html')) {
+                  res = proxyRes;
+                } else {
+                  console.warn('Proxy returned HTML (static hosting fallback), trying original URL...');
+                }
               }
+            } catch (e) {
+              console.warn('Proxy fetch failed:', e);
+            }
+          }
+
+          // Try original URL fetch if still not loaded
+          if ((!res || !res.ok) && url !== direct && !url.includes('/api/proxy-file')) {
+            try {
+              res = await fetch(url);
+            } catch (uErr) {
+              console.warn('Original URL fetch failed:', uErr);
             }
           }
 
           if (res && res.ok) {
             const contentType = res.headers.get('content-type') || '';
             if (contentType.includes('text/html')) {
-              throw new Error('Tautan berkas mengembalikan halaman web alih-alih berkas dokumen Word.');
+              throw new Error('Pratinjau visual langsung tidak tersedia di hosting statis tanpa backend proxy. Silakan klik tombol "Unduh Berkas" di atas untuk membuka dokumen secara utuh di Microsoft Word.');
             }
             buffer = await res.arrayBuffer();
           }
