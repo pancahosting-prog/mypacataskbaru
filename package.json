@@ -7,11 +7,13 @@
     "dev": "tsx server.ts",
     "build": "vite build",
     "start": "tsx server.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.48.1",
     "cors": "^2.8.6",
+    "docx-preview": "^0.4.1",
     "express": "^5.2.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
