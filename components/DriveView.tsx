@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DrivePost, DriveAttachment } from '../types';
 import { supabaseService } from '../services/supabaseService';
-import { getProxiedUrl, isImageFile, isPdfFile, isDocxFile, handleImageError, downloadFile } from '../services/proxyService';
-import { DocxViewer } from './DocxViewer';
-import { GenericFileViewer } from './GenericFileViewer';
+import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
 interface DriveViewProps {
   currentUser: {
@@ -36,25 +34,8 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
   const [shareUnit, setShareUnit] = useState<'hours' | 'days' | 'weeks'>('hours');
   const [generatedLink, setGeneratedLink] = useState('');
   const [copied, setCopied] = useState(false);
-  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string; size?: number } | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string; fileType: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [isDownloadingFile, setIsDownloadingFile] = useState(false);
-  const [useBase64Mode, setUseBase64Mode] = useState(true); // Default to true for Netlify/ISP block reliability
-
-  const handleDownloadFile = async (file: { url: string; name: string }) => {
-    setIsDownloadingFile(true);
-    try {
-      const ok = await downloadFile(file.url, file.name);
-      if (!ok) {
-        alert('Gagal mengunduh berkas. Silakan coba lagi atau buka tautan sumber.');
-      }
-    } catch (err) {
-      console.error('Download error:', err);
-      alert('Terjadi kesalahan saat mengunduh berkas.');
-    } finally {
-      setIsDownloadingFile(false);
-    }
-  };
 
   useEffect(() => {
     // Load ImageKit settings from environment variables first, then fallback to localStorage
@@ -87,7 +68,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const filesArr = Array.from(e.target.files) as File[];
+      const filesArr = Array.from(e.target.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
       
       const newProgress = { ...uploadProgress };
@@ -111,7 +92,7 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filesArr = Array.from(e.dataTransfer.files) as File[];
+      const filesArr = Array.from(e.dataTransfer.files);
       setSelectedFiles(prev => [...prev, ...filesArr]);
       
       const newProgress = { ...uploadProgress };
@@ -209,50 +190,26 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-
+    if (selectedFiles.length > 0 && (!ikUrl || !ikPublic || !ikPrivate)) {
+      setErrorMessage('Ada file yang dipilih, tetapi konfigurasi ImageKit belum lengkap di environment variables (VITE_IMAGEKIT_URL_ENDPOINT, VITE_IMAGEKIT_PUBLIC_KEY, VITE_IMAGEKIT_PRIVATE_KEY).');
+      return;
+    }
 
     setIsPublishing(true);
     setErrorMessage('');
     const uploadedAttachments: DriveAttachment[] = [];
 
     try {
-      // Upload each file to ImageKit or convert to Base64
+      // Upload each file to ImageKit
       for (const file of selectedFiles) {
         setUploadProgress(prev => ({ ...prev, [file.name]: 'uploading' }));
         try {
-          let attachment: DriveAttachment;
-
-          // Limit Base64 size to 10MB
-          if (file.size > 10 * 1024 * 1024) {
-             throw new Error(`Berkas "${file.name}" terlalu besar (Max 10MB).`);
-          }
-
-          if (useBase64Mode) {
-            // Read as Data URL (Base64) - Bypass ISP Block!
-            const dataUrl = await new Promise<string>((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onload = () => resolve(reader.result as string);
-              reader.onerror = () => reject(new Error('Gagal membaca berkas.'));
-              reader.readAsDataURL(file);
-            });
-
-            attachment = {
-              name: file.name,
-              url: dataUrl,
-              fileType: file.type || 'application/octet-stream',
-              fileId: `b64_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
-              size: file.size
-            };
-          } else {
-            // Standard ImageKit upload
-            attachment = await uploadToImageKit(file);
-          }
-
+          const attachment = await uploadToImageKit(file);
           uploadedAttachments.push(attachment);
           setUploadProgress(prev => ({ ...prev, [file.name]: 'success' }));
         } catch (uploadErr: any) {
           setUploadProgress(prev => ({ ...prev, [file.name]: 'error' }));
-          throw new Error(`Gagal memproses berkas "${file.name}": ${uploadErr.message}`);
+          throw new Error(`Gagal mengunggah file "${file.name}": ${uploadErr.message}`);
         }
       }
 
@@ -460,9 +417,28 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h3 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">Panca Drive</h3>
-          <p className="text-sm text-slate-400">Bagikan postingan, lampirkan berbagai tipe file, dan buat link akses temporary.</p>
+          <p className="text-sm text-slate-400">Bagikan postingan, lampirkan berbagai tipe file, dan buat link akses temporary via ImageKit.</p>
         </div>
       </div>
+
+      {/* WARNING IF NO IMAGEKIT */}
+      {!ikUrl && (
+        <div className="bg-amber-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex items-start gap-3">
+            <svg className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <div>
+              <p className="font-bold text-amber-900">Upload Lampiran Memerlukan Konfigurasi Env ImageKit</p>
+              <p className="text-xs text-amber-700">
+                Silakan isi environment variables <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_URL_ENDPOINT</code>, <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PUBLIC_KEY</code>, dan <code className="bg-amber-100 px-1 py-0.5 rounded font-mono text-[11px]">VITE_IMAGEKIT_PRIVATE_KEY</code> untuk mengaktifkan fitur upload lampiran.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* NEW POST FORM */}
       <div className="bg-slate-50 dark:bg-slate-900/40 p-8 rounded-[32px] border border-slate-200/80">
@@ -475,8 +451,6 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
         </h3>
 
         <form onSubmit={handlePublishPost} className="space-y-6">
-
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-4">
               <div>
@@ -881,10 +855,9 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
 
       {/* PREVIEW MODAL */}
       {previewFile && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-slate-950/90 backdrop-blur-sm animate-fade-in overflow-hidden">
-          <div className="bg-slate-900 w-full max-w-6xl rounded-[24px] sm:rounded-[32px] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-slate-800 flex flex-col h-full max-h-[92vh] relative overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between bg-slate-900 border-b border-slate-800 p-4 md:px-6 shrink-0">
+        <div className="fixed inset-0 z-[200] flex flex-col justify-between p-4 md:p-6 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between bg-slate-900 border border-slate-800 p-4 md:px-6 rounded-3xl shadow-xl w-full max-w-5xl mx-auto mb-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="p-2 bg-slate-800 rounded-xl shrink-0">
                 {getFileIcon(previewFile.fileType, previewFile.name)}
@@ -898,32 +871,21 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => handleDownloadFile(previewFile)}
-                disabled={isDownloadingFile}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95 disabled:opacity-50"
-                title="Unduh Berkas ke Perangkat"
+              {/* Unduh button in header */}
+              <a
+                href={getProxiedUrl(previewFile.url, true, previewFile.name)}
+                download={previewFile.name}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition-all shadow-md active:scale-95"
               >
-                {isDownloadingFile ? (
-                  <>
-                    <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    <span>Mengunduh...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    <span>Unduh</span>
-                  </>
-                )}
-              </button>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Unduh
+              </a>
 
               {/* Close Button */}
               <button
@@ -938,46 +900,57 @@ export const DriveView: React.FC<DriveViewProps> = ({ currentUser }) => {
           </div>
 
           {/* Viewer Stage */}
-          <div className="flex-1 bg-slate-950 overflow-hidden relative w-full flex flex-col items-center justify-center p-0">
+          <div className="flex-1 bg-slate-900 border border-slate-800 rounded-[32px] overflow-hidden relative shadow-2xl w-full max-w-5xl mx-auto flex items-center justify-center p-4">
             {isImageFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
-              <div className="w-full h-full p-4 sm:p-8 flex items-center justify-center">
+              <div className="max-w-full max-h-full overflow-auto flex items-center justify-center">
                 <img
                   src={getProxiedUrl(previewFile.url)}
                   alt={previewFile.name}
                   onError={(e) => handleImageError(e, previewFile.url)}
-                  className="max-h-full w-auto object-contain rounded-xl shadow-2xl border border-slate-700 bg-slate-900"
+                  className="max-w-full max-h-[75vh] object-contain rounded-2xl shadow-lg border border-slate-800 bg-slate-950"
                 />
               </div>
             ) : isPdfFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
-              <iframe
-                src={getProxiedUrl(previewFile.url)}
-                className="w-full h-full border-none bg-white"
-                title={previewFile.name}
-              />
-            ) : isDocxFile(previewFile.fileType, previewFile.name || previewFile.url) ? (
-              <DocxViewer
-                url={previewFile.url}
-                filename={previewFile.name}
-                size={previewFile.size}
-                onDownload={() => handleDownloadFile(previewFile)}
-                isDownloading={isDownloadingFile}
-              />
+              <div className="w-full h-full relative flex flex-col justify-center items-center">
+                <iframe
+                  src={getProxiedUrl(previewFile.url)}
+                  className="w-full h-full border-0 relative z-10 rounded-2xl bg-white"
+                  title={previewFile.name}
+                />
+              </div>
             ) : (
-              <div className="w-full h-full p-4 sm:p-8 flex items-center justify-center">
-                <GenericFileViewer
-                  url={previewFile.url}
-                  filename={previewFile.name}
-                  fileType={previewFile.fileType}
-                  size={previewFile.size}
-                  onDownload={() => handleDownloadFile(previewFile)}
-                  isDownloading={isDownloadingFile}
+              <div className="w-full h-full relative flex flex-col justify-center items-center p-6 text-center space-y-4">
+                <div className="p-4 bg-slate-800 rounded-2xl text-slate-300">
+                  {getFileIcon(previewFile.fileType, previewFile.name)}
+                </div>
+                <div>
+                  <h5 className="text-white font-bold text-sm truncate max-w-md">{previewFile.name}</h5>
+                  <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir ISP)</p>
+                </div>
+                <div className="flex gap-3 pt-2 z-20">
+                  <a
+                    href={getProxiedUrl(previewFile.url, true, previewFile.name)}
+                    download={previewFile.name}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    Unduh Berkas Langsung
+                  </a>
+                </div>
+                <iframe
+                  src={`https://docs.google.com/gview?url=${encodeURIComponent(getProxiedUrl(previewFile.url, true))}&embedded=true`}
+                  className="w-full h-[350px] border-0 relative z-10 rounded-2xl bg-white mt-2"
+                  title="Google Document Viewer"
                 />
               </div>
             )}
           </div>
+
+          {/* Footer inside modal */}
+          <div className="text-center text-[8px] font-black text-slate-600 uppercase tracking-widest pt-4">
+            Didukung oleh Google Docs Viewer Engine
+          </div>
         </div>
-      </div>
-    )}
+      )}
     </div>
   );
 };

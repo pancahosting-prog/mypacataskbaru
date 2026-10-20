@@ -287,7 +287,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
     title: string;
     subtitle: string;
     color: string;
-    icon: React.ReactNode;
+    icon: JSX.Element;
     restrictedRoles: string;
   }[] = [
     {
@@ -374,7 +374,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                 Database Knowledge Project PT Panca
               </h2>
               <p className="text-xs text-slate-400 font-semibold">
-                Penyimpanan Berkas, Viewer Aplikasi & SOP Engineering Terstruktur
+                Penyimpanan Berkas via ImageKit, Viewer Aplikasi & SOP Engineering Terstruktur
               </p>
             </div>
           </div>
@@ -595,7 +595,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                 <div>
                   <div className="mb-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">
-                      Pilih Folder Akses untuk Melihat / Mengunggah Dokumen
+                      Pilih Folder Akses untuk Melihat / Mengunggah Dokumen ImageKit
                     </p>
                   </div>
 
@@ -677,7 +677,7 @@ export const ProjectView: React.FC<ProjectViewProps> = ({
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
                           <path d="M12 4v16m8-8H4" />
                         </svg>
-                        Upload Dokumen
+                        Upload Dokumen ImageKit
                       </button>
                     )}
                   </div>

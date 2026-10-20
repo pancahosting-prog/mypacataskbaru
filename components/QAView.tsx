@@ -1,8 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { QAQuestion, QAAnswer, QAAttachment } from '../types';
-import { getProxiedUrl, isImageFile, isPdfFile, isDocxFile, handleImageError, downloadFile } from '../services/proxyService';
-import { DocxViewer } from './DocxViewer';
-import { GenericFileViewer } from './GenericFileViewer';
+import { getProxiedUrl, isImageFile, isPdfFile, handleImageError } from '../services/proxyService';
 
 interface QAViewProps {
   currentUser: {
@@ -43,8 +41,6 @@ export const QAView: React.FC<QAViewProps> = ({
   const [editingQuestion, setEditingQuestion] = useState<QAQuestion | null>(null);
   const [editingAnswer, setEditingAnswer] = useState<QAAnswer | null>(null);
   const [previewAttachment, setPreviewAttachment] = useState<QAAttachment | null>(null);
-  const [isDownloadingAttachment, setIsDownloadingAttachment] = useState(false);
-  const [downloadToast, setDownloadToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Ask Form State
   const [newTitle, setNewTitle] = useState('');
@@ -68,7 +64,6 @@ export const QAView: React.FC<QAViewProps> = ({
   const [answerAttachments, setAnswerAttachments] = useState<QAAttachment[]>([]);
   const [isUploadingAnswerFile, setIsUploadingAnswerFile] = useState(false);
   const [answerUploadError, setAnswerUploadError] = useState('');
-  const [useBase64Mode, setUseBase64Mode] = useState(true); // Default to true to bypass ISP blocking
 
   // Edit Answer Form State
   const [editAnswerContent, setEditAnswerContent] = useState('');
@@ -169,59 +164,19 @@ export const QAView: React.FC<QAViewProps> = ({
     try {
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        let fileUrl = '';
-        let fileSize = file.size;
-
-        // Limit Base64 size to 10MB to prevent database issues
-        if (fileSize > 10 * 1024 * 1024) {
-          throw new Error(`Berkas "${file.name}" terlalu besar (Max 10MB). Kurangi ukuran berkas atau gunakan link eksternal.`);
-        }
-
-        // Try ImageKit upload first ONLY if Base64 mode is OFF
-        if (!useBase64Mode) {
-          const envUrl = (import.meta.env.VITE_IMAGEKIT_URL_ENDPOINT || '').trim();
-          const envPublic = (import.meta.env.VITE_IMAGEKIT_PUBLIC_KEY || '').trim();
-          const envPrivate = (import.meta.env.VITE_IMAGEKIT_PRIVATE_KEY || '').trim();
-          const ikUrl = envUrl || localStorage.getItem('mypanca_imagekit_url') || '';
-          const ikPublic = envPublic || localStorage.getItem('mypanca_imagekit_public') || '';
-          const ikPrivate = envPrivate || localStorage.getItem('mypanca_imagekit_private') || '';
-
-          if (ikUrl && ikPublic && ikPrivate) {
-            try {
-              const res = await uploadToImageKit(file);
-              fileUrl = res.url;
-              fileSize = res.size || file.size;
-            } catch (uploadErr: any) {
-              console.warn('ImageKit upload failed, falling back to local storage:', uploadErr);
-            }
-          }
-        }
-
-        // Fallback or Primary: Read as Data URL (Base64) - This bypasses ISP blocking!
-        if (!fileUrl) {
-          fileUrl = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error('Gagal membaca berkas.'));
-            reader.readAsDataURL(file);
-          });
-        }
-
-        const isDoc = isDocxFile(file.type, file.name);
+        const res = await uploadToImageKit(file);
         const fileType = file.type.startsWith('image/')
           ? 'img'
           : file.type.includes('pdf')
           ? 'pdf'
-          : isDoc
-          ? 'docx'
           : 'file';
 
         const item: QAAttachment = {
-          id: `att_${Date.now()}_${i}_${Math.random().toString(36).substring(2, 6)}`,
+          id: `att_${Date.now()}_${i}`,
           name: file.name,
-          url: fileUrl,
+          url: res.url,
           fileType,
-          size: fileSize
+          size: res.size
         };
 
         if (target === 'ask') {
@@ -246,26 +201,6 @@ export const QAView: React.FC<QAViewProps> = ({
       else if (target === 'editQuestion') setIsUploadingEditQuestionFile(false);
       else setIsUploadingEditAnswerFile(false);
       e.target.value = '';
-    }
-  };
-
-  const handleDownloadAttachment = async (att: QAAttachment) => {
-    setIsDownloadingAttachment(true);
-    try {
-      const ok = await downloadFile(att.url, att.name);
-      if (ok) {
-        setDownloadToast({ message: `Berkas "${att.name}" berhasil diunduh.`, type: 'success' });
-      } else {
-        setDownloadToast({ message: `Gagal mengunduh berkas "${att.name}". Silakan coba lagi.`, type: 'error' });
-      }
-    } catch (err: any) {
-      console.error('Download error:', err);
-      setDownloadToast({ message: err.message || 'Terjadi kesalahan saat mengunduh berkas.', type: 'error' });
-    } finally {
-      setIsDownloadingAttachment(false);
-      setTimeout(() => {
-        setDownloadToast(null);
-      }, 3500);
     }
   };
 
@@ -571,97 +506,36 @@ export const QAView: React.FC<QAViewProps> = ({
 
                 {/* Question Attachments */}
                 {q.attachments && q.attachments.length > 0 && (
-                  <div className="flex flex-wrap gap-2.5 pt-2">
+                  <div className="flex flex-wrap gap-3 pt-2">
                     {q.attachments.map(att => {
                       const isImg = isImageFile(att.fileType, att.name || att.url);
-                      const isDoc = isDocxFile(att.fileType, att.name || att.url);
-
-                      if (isImg) {
-                        return (
-                          <button
-                            key={att.id}
-                            onClick={() => setPreviewAttachment(att)}
-                            className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-32 w-48 shadow-xs hover:border-indigo-500 transition-all text-left shrink-0 active:scale-98"
-                            title={`Lihat gambar ${att.name}`}
-                          >
-                            <img
-                              src={getProxiedUrl(att.url)}
-                              alt={att.name}
-                              onError={(e) => handleImageError(e, att.url)}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                              loading="lazy"
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2.5 flex flex-col justify-end">
-                              <span className="text-[10px] font-bold text-white truncate drop-shadow-xs">{att.name}</span>
-                            </div>
-                          </button>
-                        );
-                      }
-
-                      if (isDoc) {
-                        return (
-                          <div
-                            key={att.id}
-                            className="flex items-center gap-1.5 p-1.5 bg-blue-50/80 dark:bg-blue-950/40 border border-blue-200/90 dark:border-blue-900/60 rounded-xl max-w-full shadow-2xs hover:border-blue-400 transition-all"
-                          >
-                            <button
-                              type="button"
-                              onClick={() => setPreviewAttachment(att)}
-                              className="flex items-center gap-2 px-2.5 py-1 text-xs font-bold text-blue-900 dark:text-blue-100 hover:text-blue-700 transition-all truncate max-w-[200px] sm:max-w-xs text-left"
-                              title={`Buka pratinjau dokumen Word: ${att.name}`}
-                            >
-                              <span className="w-6 h-6 rounded-md bg-blue-600 text-white font-black text-[10px] flex items-center justify-center shrink-0 shadow-xs">
-                                W
-                              </span>
-                              <span className="truncate">{att.name}</span>
-                              <span className="text-[10px] text-blue-600 dark:text-blue-400 font-extrabold uppercase shrink-0">(Pratinjau)</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadAttachment(att)}
-                              disabled={isDownloadingAttachment}
-                              className="p-1.5 text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-white hover:bg-blue-100 dark:hover:bg-blue-900/60 rounded-lg transition-all shrink-0 active:scale-95"
-                              title="Unduh langsung berkas .docx ini"
-                            >
-                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                                <polyline points="7 10 12 15 17 10" />
-                                <line x1="12" y1="15" x2="12" y2="3" />
-                              </svg>
-                            </button>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <div
+                      return isImg ? (
+                        <button
                           key={att.id}
-                          className="flex items-center gap-1.5 p-1.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold hover:border-indigo-400 transition-all max-w-full"
+                          onClick={() => setPreviewAttachment(att)}
+                          className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-32 w-48 shadow-xs hover:border-indigo-500 transition-all text-left shrink-0 active:scale-98"
                         >
-                          <button
-                            type="button"
-                            onClick={() => setPreviewAttachment(att)}
-                            className="flex items-center gap-2 px-2.5 py-1 text-slate-700 dark:text-slate-200 hover:text-indigo-600 transition-all truncate max-w-[180px] sm:max-w-xs text-left"
-                            title={`Buka pratinjau berkas: ${att.name}`}
-                          >
-                            <svg className="w-4 h-4 text-indigo-500 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                            <span className="truncate">{att.name}</span>
-                            <span className="text-[10px] text-indigo-600 font-extrabold uppercase shrink-0">(Lihat)</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDownloadAttachment(att)}
-                            disabled={isDownloadingAttachment}
-                            className="p-1.5 text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg transition-all shrink-0 active:scale-95"
-                            title="Unduh berkas ini"
-                          >
-                            <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                              <polyline points="7 10 12 15 17 10" />
-                              <line x1="12" y1="15" x2="12" y2="3" />
-                            </svg>
-                          </button>
-                        </div>
+                          <img
+                            src={getProxiedUrl(att.url)}
+                            alt={att.name}
+                            onError={(e) => handleImageError(e, att.url)}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            loading="lazy"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2.5 flex flex-col justify-end">
+                            <span className="text-[10px] font-bold text-white truncate drop-shadow-xs">{att.name}</span>
+                          </div>
+                        </button>
+                      ) : (
+                        <button
+                          key={att.id}
+                          onClick={() => setPreviewAttachment(att)}
+                          className="flex items-center gap-2 px-3.5 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold hover:border-indigo-500 transition-all"
+                        >
+                          <svg className="w-4 h-4 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                          <span className="truncate max-w-[180px]">{att.name}</span>
+                          <span className="text-[10px] text-indigo-600 font-bold uppercase">(Lihat)</span>
+                        </button>
                       );
                     })}
                   </div>
@@ -711,85 +585,34 @@ export const QAView: React.FC<QAViewProps> = ({
                     </p>
 
                     {latestAnswer.attachments && latestAnswer.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-2 pt-1 max-w-full">
+                      <div className="flex flex-wrap gap-2.5 pt-1 max-w-full">
                         {latestAnswer.attachments.map(att => {
                           const isImg = isImageFile(att.fileType, att.name || att.url);
-                          const isDoc = isDocxFile(att.fileType, att.name || att.url);
-
-                          if (isImg) {
-                            return (
-                              <button
-                                key={att.id}
-                                onClick={() => setPreviewAttachment(att)}
-                                className="group relative rounded-xl overflow-hidden border border-amber-200 dark:border-amber-900/50 bg-slate-900 h-24 w-36 shadow-xs hover:border-amber-500 transition-all shrink-0 active:scale-98"
-                                title={`Lihat gambar ${att.name}`}
-                              >
-                                <img
-                                  src={getProxiedUrl(att.url)}
-                                  alt={att.name}
-                                  onError={(e) => handleImageError(e, att.url)}
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                  loading="lazy"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2 flex flex-col justify-end">
-                                  <span className="text-[9px] font-bold text-white truncate">{att.name}</span>
-                                </div>
-                              </button>
-                            );
-                          }
-
-                          if (isDoc) {
-                            return (
-                              <div
-                                key={att.id}
-                                className="flex items-center gap-1.5 p-1 bg-white/90 dark:bg-slate-900 border border-blue-200 dark:border-blue-900/60 rounded-xl text-xs font-bold shadow-2xs hover:border-blue-400 transition-all"
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewAttachment(att)}
-                                  className="flex items-center gap-1.5 px-2 py-1 text-blue-900 dark:text-blue-100 hover:text-blue-700 transition-all text-xs font-bold truncate max-w-[180px]"
-                                  title={`Buka pratinjau dokumen Word: ${att.name}`}
-                                >
-                                  <span className="w-5 h-5 rounded bg-blue-600 text-white font-black text-[9px] flex items-center justify-center shrink-0">W</span>
-                                  <span className="truncate">{att.name}</span>
-                                  <span className="text-[9px] text-blue-600 dark:text-blue-400 font-extrabold uppercase shrink-0">(Pratinjau)</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadAttachment(att)}
-                                  disabled={isDownloadingAttachment}
-                                  className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-white rounded hover:bg-blue-50 dark:hover:bg-blue-900/50 transition-all"
-                                  title="Unduh berkas .docx"
-                                >
-                                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                </button>
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <div
+                          return isImg ? (
+                            <button
                               key={att.id}
-                              className="flex items-center gap-1 p-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-xl text-xs font-bold text-amber-800 dark:text-amber-200 hover:border-amber-400 transition-all"
+                              onClick={() => setPreviewAttachment(att)}
+                              className="group relative rounded-xl overflow-hidden border border-amber-200 dark:border-amber-900/50 bg-slate-900 h-24 w-36 shadow-xs hover:border-amber-500 transition-all shrink-0 active:scale-98"
                             >
-                              <button
-                                type="button"
-                                onClick={() => setPreviewAttachment(att)}
-                                className="px-2 py-0.5 truncate max-w-[180px] hover:underline"
-                                title={`Lihat berkas: ${att.name}`}
-                              >
-                                📎 {att.name}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDownloadAttachment(att)}
-                                disabled={isDownloadingAttachment}
-                                className="p-1 text-amber-700 hover:text-amber-900 dark:text-amber-300 rounded hover:bg-amber-100 dark:hover:bg-amber-900/50"
-                                title="Unduh berkas ini"
-                              >
-                                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                              </button>
-                            </div>
+                              <img
+                                src={getProxiedUrl(att.url)}
+                                alt={att.name}
+                                onError={(e) => handleImageError(e, att.url)}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                loading="lazy"
+                              />
+                              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-2 flex flex-col justify-end">
+                                <span className="text-[9px] font-bold text-white truncate">{att.name}</span>
+                              </div>
+                            </button>
+                          ) : (
+                            <button
+                              key={att.id}
+                              onClick={() => setPreviewAttachment(att)}
+                              className="px-3 py-1 bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-amber-100 transition-all flex items-center gap-1.5 max-w-full"
+                            >
+                              <span className="truncate max-w-[200px]">📎 {att.name}</span>
+                            </button>
                           );
                         })}
                       </div>
@@ -842,81 +665,31 @@ export const QAView: React.FC<QAViewProps> = ({
                             <div className="flex flex-wrap gap-2 pt-1">
                               {ans.attachments.map(att => {
                                 const isImg = isImageFile(att.fileType, att.name || att.url);
-                                const isDoc = isDocxFile(att.fileType, att.name || att.url);
-
-                                if (isImg) {
-                                  return (
-                                    <button
-                                      key={att.id}
-                                      onClick={() => setPreviewAttachment(att)}
-                                      className="group relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-20 w-28 shadow-xs hover:border-indigo-500 transition-all shrink-0 active:scale-98"
-                                      title={`Lihat gambar ${att.name}`}
-                                    >
-                                      <img
-                                        src={getProxiedUrl(att.url)}
-                                        alt={att.name}
-                                        onError={(e) => handleImageError(e, att.url)}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                        loading="lazy"
-                                      />
-                                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-1.5 flex flex-col justify-end">
-                                        <span className="text-[8px] font-bold text-white truncate">{att.name}</span>
-                                      </div>
-                                    </button>
-                                  );
-                                }
-
-                                if (isDoc) {
-                                  return (
-                                    <div
-                                      key={att.id}
-                                      className="flex items-center gap-1.5 p-1 bg-white dark:bg-slate-900 border border-blue-200 dark:border-blue-900/60 rounded-xl text-xs font-bold shadow-2xs hover:border-blue-400 transition-all"
-                                    >
-                                      <button
-                                        type="button"
-                                        onClick={() => setPreviewAttachment(att)}
-                                        className="flex items-center gap-1 px-2 py-0.5 text-blue-900 dark:text-blue-100 hover:text-blue-700 transition-all text-xs font-bold truncate max-w-[160px]"
-                                        title={`Buka pratinjau dokumen Word: ${att.name}`}
-                                      >
-                                        <span className="w-4 h-4 rounded bg-blue-600 text-white font-black text-[8px] flex items-center justify-center shrink-0">W</span>
-                                        <span className="truncate">{att.name}</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDownloadAttachment(att)}
-                                        disabled={isDownloadingAttachment}
-                                        className="p-1 text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-white rounded hover:bg-blue-50 dark:hover:bg-blue-900/50 transition-all"
-                                        title="Unduh berkas .docx"
-                                      >
-                                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                      </button>
-                                    </div>
-                                  );
-                                }
-
-                                return (
-                                  <div
+                                return isImg ? (
+                                  <button
                                     key={att.id}
-                                    className="flex items-center gap-1 p-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300"
+                                    onClick={() => setPreviewAttachment(att)}
+                                    className="group relative rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-900 h-20 w-28 shadow-xs hover:border-indigo-500 transition-all shrink-0 active:scale-98"
                                   >
-                                    <button
-                                      type="button"
-                                      onClick={() => setPreviewAttachment(att)}
-                                      className="px-1.5 py-0.5 truncate max-w-[160px] hover:underline"
-                                      title={`Lihat berkas: ${att.name}`}
-                                    >
-                                      📎 {att.name}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDownloadAttachment(att)}
-                                      disabled={isDownloadingAttachment}
-                                      className="p-1 text-slate-500 hover:text-indigo-600 dark:hover:text-white"
-                                      title="Unduh berkas ini"
-                                    >
-                                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                    </button>
-                                  </div>
+                                    <img
+                                      src={getProxiedUrl(att.url)}
+                                      alt={att.name}
+                                      onError={(e) => handleImageError(e, att.url)}
+                                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                      loading="lazy"
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent p-1.5 flex flex-col justify-end">
+                                      <span className="text-[8px] font-bold text-white truncate">{att.name}</span>
+                                    </div>
+                                  </button>
+                                ) : (
+                                  <button
+                                    key={att.id}
+                                    onClick={() => setPreviewAttachment(att)}
+                                    className="px-2.5 py-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg text-[10px] font-bold text-slate-700 dark:text-slate-300"
+                                  >
+                                    📎 {att.name}
+                                  </button>
                                 );
                               })}
                             </div>
@@ -1023,13 +796,12 @@ export const QAView: React.FC<QAViewProps> = ({
                 </div>
 
                 {/* Upload Image / File via ImageKit */}
-                <div className="space-y-4 pt-2">
-
-
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Lampirkan Gambar / Berkas (ImageKit Proxy)</label>
                   <div className="flex items-center gap-3">
-                    <label className="cursor-pointer px-4 py-3 bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-50 transition-all flex items-center gap-2 shadow-xs">
+                    <label className="cursor-pointer px-4 py-3 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-300 font-bold text-xs rounded-xl border border-indigo-200 dark:border-indigo-800 hover:bg-indigo-100 transition-all flex items-center gap-2">
                       <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                      <span>{isUploadingAskFile ? 'Memproses Berkas...' : 'Pilih Gambar/File'}</span>
+                      <span>{isUploadingAskFile ? 'Mengunggah ke ImageKit...' : 'Pilih Gambar/File'}</span>
                       <input
                         type="file"
                         multiple
@@ -1389,128 +1161,79 @@ export const QAView: React.FC<QAViewProps> = ({
         </div>
       )}
 
-      {/* In-App Attachment Viewer Modal */}
-      {previewAttachment && (() => {
-        const isDocx = isDocxFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url);
-        return (
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/90 backdrop-blur-sm animate-fade-in p-2 sm:p-4 md:p-6 overflow-hidden">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-6xl rounded-[24px] sm:rounded-[32px] shadow-[0_0_50px_-12px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-800 flex flex-col h-full max-h-[92vh] relative overflow-hidden">
-              <div className="p-3 sm:p-5 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3 shrink-0">
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className={`px-2.5 py-1 rounded-xl font-black text-xs uppercase shrink-0 shadow-2xs ${
-                    isDocx
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300'
-                  }`}>
-                    {isDocx ? 'DOKUMEN WORD (.DOCX)' : (previewAttachment.fileType || 'BERKAS')}
-                  </span>
-                  <div className="min-w-0">
-                    <h4 className="font-black text-slate-800 dark:text-white text-sm sm:text-base truncate max-w-xs sm:max-w-md" title={previewAttachment.name}>
-                      {previewAttachment.name}
-                    </h4>
-                    <p className="text-[10px] font-bold text-slate-400">
-                      Lampiran Dokumen Forum Diskusi PT Panca
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadAttachment(previewAttachment)}
-                    disabled={isDownloadingAttachment}
-                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-xs shadow-md hover:shadow-blue-500/25 active:scale-95 transition-all disabled:opacity-50"
-                    title="Unduh berkas ke perangkat"
-                  >
-                    {isDownloadingAttachment ? (
-                      <>
-                        <svg className="w-3.5 h-3.5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                        </svg>
-                        <span>Mengunduh...</span>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                        <span>Unduh Berkas</span>
-                      </>
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewAttachment(null)}
-                    className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
-                    title="Tutup Pratinjau"
-                  >
-                    <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
-                  </button>
+      {/* In-App Attachment Viewer Modal (Proxied through /api/proxy-file) */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-4xl rounded-[32px] shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-6 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <span className="p-2 bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 rounded-xl font-bold text-xs uppercase">
+                  {previewAttachment.fileType}
+                </span>
+                <div>
+                  <h4 className="font-black text-slate-800 dark:text-white text-base truncate max-w-md">{previewAttachment.name}</h4>
+                  <p className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">Proxied via Server Proxy (Anti-Block Provider)</p>
                 </div>
               </div>
 
-              <div className={`p-0 flex-1 overflow-hidden flex flex-col bg-slate-100 dark:bg-slate-950 ${
-                isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url)
-                  ? 'items-center justify-center p-4 sm:p-8'
-                  : ''
-              }`}>
-                {isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
-                  <img
-                    src={getProxiedUrl(previewAttachment.url)}
-                    alt={previewAttachment.name}
-                    onError={(e) => handleImageError(e, previewAttachment.url)}
-                    className="max-h-[75vh] w-auto object-contain rounded-2xl shadow-xl border border-slate-200 dark:border-slate-800"
-                  />
-                ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
-                  <iframe
-                    src={getProxiedUrl(previewAttachment.url)}
-                    className="w-full h-full border-none bg-white"
-                    title={previewAttachment.name}
-                  />
-                ) : isDocx ? (
-                  <div className="w-full h-full flex flex-col">
-                    <DocxViewer
-                      url={previewAttachment.url}
-                      filename={previewAttachment.name}
-                      size={previewAttachment.size}
-                      onDownload={() => handleDownloadAttachment(previewAttachment)}
-                      isDownloading={isDownloadingAttachment}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-full h-full flex flex-col p-4 sm:p-8 items-center justify-center">
-                    <GenericFileViewer
-                      url={previewAttachment.url}
-                      filename={previewAttachment.name}
-                      fileType={previewAttachment.fileType}
-                      size={previewAttachment.size}
-                      onDownload={() => handleDownloadAttachment(previewAttachment)}
-                      isDownloading={isDownloadingAttachment}
-                    />
-                  </div>
-                )}
+              <div className="flex items-center gap-3">
+                <a
+                  href={getProxiedUrl(previewAttachment.url, true, previewAttachment.name)}
+                  download={previewAttachment.name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-bold text-xs shadow-md hover:bg-indigo-700 transition-all"
+                >
+                  Unduh Berkas
+                </a>
+                <button
+                  onClick={() => setPreviewAttachment(null)}
+                  className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-xl"
+                >
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6 6 18M6 6l12 12"/></svg>
+                </button>
               </div>
             </div>
-          </div>
-        );
-      })()}
 
-      {/* Floating Download Notification Toast */}
-      {downloadToast && (
-        <div className="fixed bottom-6 right-6 z-[400] flex items-center gap-3 px-5 py-3.5 bg-slate-900 text-white rounded-2xl shadow-2xl border border-slate-700 animate-slide-up">
-          {downloadToast.type === 'success' ? (
-            <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-xs font-black shrink-0">
-              ✓
-            </span>
-          ) : (
-            <span className="w-6 h-6 rounded-full bg-rose-500 text-white flex items-center justify-center text-xs font-black shrink-0">
-              !
-            </span>
-          )}
-          <span className="text-xs font-bold leading-snug">{downloadToast.message}</span>
+            <div className="p-6 flex-1 overflow-y-auto flex items-center justify-center bg-slate-100 dark:bg-slate-950">
+              {isImageFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
+                <img
+                  src={getProxiedUrl(previewAttachment.url)}
+                  alt={previewAttachment.name}
+                  onError={(e) => handleImageError(e, previewAttachment.url)}
+                  className="max-h-[70vh] object-contain rounded-2xl shadow-md border border-slate-200 dark:border-slate-800"
+                />
+              ) : isPdfFile(previewAttachment.fileType, previewAttachment.name || previewAttachment.url) ? (
+                <iframe
+                  src={getProxiedUrl(previewAttachment.url)}
+                  className="w-full h-[70vh] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white"
+                  title={previewAttachment.name}
+                />
+              ) : (
+                <div className="w-full flex flex-col items-center justify-center p-6 text-center space-y-4">
+                  <div className="p-4 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-2xl font-black text-2xl">
+                    📄
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-800 dark:text-white text-sm truncate max-w-md">{previewAttachment.name}</h5>
+                    <p className="text-xs text-slate-400 mt-1">Dokumen disajikan langsung via Server Proxy (Bebas Blokir Provider)</p>
+                  </div>
+                  <a
+                    href={getProxiedUrl(previewAttachment.url, true, previewAttachment.name)}
+                    download={previewAttachment.name}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition-all"
+                  >
+                    Unduh Berkas Langsung
+                  </a>
+                  <iframe
+                    src={`https://docs.google.com/viewer?url=${encodeURIComponent(getProxiedUrl(previewAttachment.url, true))}&embedded=true`}
+                    className="w-full h-[350px] rounded-2xl border border-slate-200 dark:border-slate-800 bg-white mt-2"
+                    title={previewAttachment.name}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
